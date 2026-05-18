@@ -1,0 +1,31 @@
+{
+  "name": "m5-websocket-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "server": "bun run src/server/index.ts",
+    "lint": "biome check .",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "build": "vite build",
+    "test": "vitest run",
+    "simulate:device": "bun run scripts/simulate-device.ts"
+  },
+  "dependencies": {
+    "lucide-svelte": "^1.0.1",
+    "svelte": "^5.55.8",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/kit": "^2.60.1",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@types/bun": "^1.3.14",
+    "svelte-check": "^4.4.8",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13",
+    "vitest": "^4.1.6"
+  }
+}

@@ -24,6 +24,41 @@ All implementation sessions must read these files before editing code.
 - No VR or Neural Flight integration yet.
 - Web Serial is the setup mechanism for WiFi, WebSocket URL, and device ID.
 
+## Local Setup
+
+Install dependencies:
+
+```sh
+bun install
+```
+
+Run the SvelteKit skeleton:
+
+```sh
+bun run dev
+```
+
+Run the Bun WebSocket hub:
+
+```sh
+bun run server
+```
+
+Send simulated device telemetry to the hub:
+
+```sh
+bun run simulate:device
+```
+
+Run verification checks:
+
+```sh
+bun run lint
+bun run check
+bun run build
+bun run test
+```
+
 ## Coordination Rules
 
 - Keep server/protocol, firmware, and UI work in separate sessions when possible.

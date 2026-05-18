@@ -1,0 +1,9 @@
+node_modules/
+.svelte-kit/
+.vite/
+build/
+dist/
+coverage/
+*.local
+.DS_Store
+*.log

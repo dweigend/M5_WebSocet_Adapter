@@ -3,8 +3,8 @@
 ## Coordination Status
 
 - [x] WP0: Repository coordination files are present.
-- [ ] WP1: Project skeleton and Git repository are initialized.
-- [ ] WP2: Bun WebSocket hub is implemented.
+- [x] WP1: Project skeleton and Git repository are initialized.
+- [x] WP2: Bun WebSocket hub is implemented.
 - [ ] WP3: Firmware skeleton and telemetry loop are implemented.
 - [ ] WP4: Web Serial setup UI is implemented.
 - [ ] WP5: Three.js live test UI is implemented.
@@ -48,13 +48,13 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] `git status --short --branch` works.
-- [ ] `bun install` succeeds.
-- [ ] `bun run lint` succeeds.
-- [ ] `bun run check` succeeds.
-- [ ] `bun run build` succeeds.
-- [ ] `bun run test` succeeds.
-- [ ] A checkpoint commit exists.
+- [x] `git status --short --branch` works.
+- [x] `bun install` succeeds.
+- [x] `bun run lint` succeeds.
+- [x] `bun run check` succeeds.
+- [x] `bun run build` succeeds.
+- [x] `bun run test` succeeds.
+- [x] A checkpoint commit exists.
 
 ## WP2: Bun WebSocket Hub
 
@@ -79,13 +79,13 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] Invalid JSON is rejected without crashing the server.
-- [ ] Unknown message types are rejected.
-- [ ] `register`, `heartbeat`, `imu`, and `orientation` update device state.
-- [ ] Sequence gaps increase packet-loss estimate.
-- [ ] Missing telemetry for more than 3 seconds marks device safe mode.
-- [ ] UI clients receive snapshots and live updates.
-- [ ] Unit tests cover validation, sequence handling, and stale-device logic.
+- [x] Invalid JSON is rejected without crashing the server.
+- [x] Unknown message types are rejected.
+- [x] `register`, `heartbeat`, `imu`, and `orientation` update device state.
+- [x] Sequence gaps increase packet-loss estimate.
+- [x] Missing telemetry for more than 3 seconds marks device safe mode.
+- [x] UI clients receive snapshots and live updates.
+- [x] Unit tests cover validation, sequence handling, and stale-device logic.
 
 Metrics:
 
