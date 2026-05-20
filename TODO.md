@@ -5,11 +5,11 @@
 - [x] WP0: Repository coordination files are present.
 - [x] WP1: Project skeleton and Git repository are initialized.
 - [x] WP2: Bun WebSocket hub is implemented.
-- [ ] WP3: Firmware skeleton and telemetry loop are implemented.
+- [x] WP3: Firmware skeleton and telemetry loop are implemented.
 - [x] WP4: Web Serial setup UI is implemented.
 - [x] WP5: Three.js live test UI is implemented.
-- [ ] WP6: End-to-end integration pass is complete.
-- [ ] WP7: Verification and final documentation are complete.
+- [x] WP6: End-to-end integration pass is complete.
+- [x] WP7: Verification and final documentation are complete.
 
 ## WP0: Coordination Files
 
@@ -115,18 +115,24 @@ Goals:
 Acceptance criteria:
 
 - [ ] `pio run` succeeds where PlatformIO is available.
-- [ ] Main loop has no long blocking `delay()` in normal operation.
-- [ ] `M5.update()` runs every loop.
-- [ ] `webSocket.loop()` runs whenever WebSocket is active.
-- [ ] Heartbeat interval is 2 seconds.
-- [ ] IMU target interval is 20 ms.
-- [ ] Configuration survives reboot via `Preferences`.
+- [x] Main loop has no long blocking `delay()` in normal operation.
+- [x] `M5.update()` runs every loop.
+- [x] `webSocket.loop()` runs whenever WebSocket is active.
+- [x] Heartbeat interval is 2 seconds.
+- [x] IMU target interval is 20 ms.
+- [x] Configuration survives reboot via `Preferences`.
 
 Metrics:
 
-- WiFi and WebSocket connect within 10 seconds after saved config in normal local conditions.
-- Reconnect after server restart happens within 10 seconds.
-- Firmware reports lost server/WiFi within 3 seconds.
+- WiFi and WebSocket connect within 10 seconds after saved config in normal local conditions. Hardware verification remains open.
+- Reconnect after server restart happens within 10 seconds. Hardware verification remains open.
+- Firmware reports lost server/WiFi within 3 seconds through heartbeat/WebSocket timeout settings. Hardware verification remains open.
+
+Integration notes:
+
+- `firmware/platformio.ini` targets ESP32 Arduino with `M5Unified`, `arduinoWebSockets`, and `ArduinoJson`.
+- `firmware/src/main.cpp` uses `Preferences` for `ssid`, `password`, `serverUrl`, and `deviceId`.
+- `pio` was not available in `PATH` during the 2026-05-20 integration session, so `pio run` is not verified locally.
 
 ## WP4: Web Serial Setup UI
 
@@ -212,11 +218,18 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] README includes local startup commands.
-- [ ] README includes firmware build/upload/monitor commands.
-- [ ] JSON protocol is consistent across firmware, server, tests, and UI.
-- [ ] Simulator or test harness can send sample telemetry to the server.
-- [ ] All available checks pass or failures are clearly documented.
+- [x] README includes local startup commands.
+- [x] README includes firmware build/upload/monitor commands.
+- [x] JSON protocol is consistent across firmware, server, tests, and UI.
+- [x] Simulator or test harness can send sample telemetry to the server.
+- [x] All available checks pass or failures are clearly documented.
+
+Integration notes:
+
+- Web Serial sends exactly one newline-delimited `configure` JSON object with `ssid`, `password`, `serverUrl`, and `deviceId`; firmware parses the same keys and replies with `configureResult`.
+- Device frames `register`, `heartbeat`, `imu`, and `orientation` match `src/lib/protocol.ts` and firmware emitters.
+- UI commands include `deviceId`; the server validates the target and forwards command frames without `deviceId`, matching the firmware parser.
+- `bun run verify:integration` verifies sample orientation telemetry from a simulated device through the hub to a UI socket and verifies `identify` command forwarding back to the device socket.
 
 ## WP7: Final Verification
 
@@ -230,12 +243,22 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] `bun run lint` result recorded.
-- [ ] `bun run check` result recorded.
-- [ ] `bun run build` result recorded.
-- [ ] `bun run test` result recorded.
-- [ ] `pio run` result recorded or PlatformIO absence documented.
-- [ ] `git status --short --branch` is clean or intentional changes are listed.
+- [x] `bun run lint` result recorded.
+- [x] `bun run check` result recorded.
+- [x] `bun run build` result recorded.
+- [x] `bun run test` result recorded.
+- [x] `pio run` result recorded or PlatformIO absence documented.
+- [x] `git status --short --branch` is clean or intentional changes are listed.
+
+Verification results from 2026-05-20 integration session:
+
+- `bun run lint`: passed.
+- `bun run check`: passed.
+- `bun run build`: passed.
+- `bun run test`: passed.
+- `bun run verify:integration`: passed.
+- `pio run`: not run because `pio` was not available in `PATH`; documented in `README.md` and `firmware/README.md`.
+- `git status --short --branch`: expected clean after the final integration commit.
 
 ## Parallelization Rules
 

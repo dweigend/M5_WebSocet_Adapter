@@ -32,13 +32,13 @@ Install dependencies:
 bun install
 ```
 
-Run the SvelteKit skeleton:
+Run the SvelteKit UI:
 
 ```sh
 bun run dev
 ```
 
-Run the Bun WebSocket hub:
+Run the Bun WebSocket hub in a second terminal:
 
 ```sh
 bun run server
@@ -50,6 +50,12 @@ Send simulated device telemetry to the hub:
 bun run simulate:device
 ```
 
+Run the integration harness for telemetry broadcast and command forwarding:
+
+```sh
+bun run verify:integration
+```
+
 Run verification checks:
 
 ```sh
@@ -58,6 +64,32 @@ bun run check
 bun run build
 bun run test
 ```
+
+## Firmware
+
+Build the M5StickC Plus2 firmware:
+
+```sh
+cd firmware
+pio run
+```
+
+Upload the firmware:
+
+```sh
+cd firmware
+pio run --target upload
+```
+
+Open the serial monitor:
+
+```sh
+cd firmware
+pio device monitor --baud 115200
+```
+
+If `pio` is not installed, the firmware cannot be verified locally from this checkout. During the
+2026-05-20 integration session, PlatformIO was not available in `PATH`, so `pio run` was not run.
 
 ## Coordination Rules
 

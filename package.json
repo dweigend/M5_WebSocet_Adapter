@@ -10,7 +10,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "build": "vite build",
     "test": "vitest run",
-    "simulate:device": "bun run scripts/simulate-device.ts"
+    "simulate:device": "bun run scripts/simulate-device.ts",
+    "verify:integration": "bun run scripts/verify-integration.ts"
   },
   "dependencies": {
     "lucide-svelte": "^1.0.1",
