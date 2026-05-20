@@ -10,7 +10,6 @@ import {
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
-  Quaternion,
   Scene,
   WebGLRenderer,
 } from "three";
@@ -31,7 +30,7 @@ let { orientation, safeMode }: Props = $props();
 let canvas: HTMLCanvasElement | undefined = $state();
 let container: HTMLDivElement | undefined = $state();
 let stickModel: Group | undefined;
-let targetOrientation = new Quaternion();
+let targetOrientation = createSensorOrientationQuaternion({ pitch: 0, roll: 0, yaw: 0 });
 
 $effect(() => {
   if (!orientation) {
@@ -168,8 +167,6 @@ function createStickModel(): Group {
   sideButton.position.set(0.68, -0.12, 0.04);
   group.add(sideButton);
 
-  group.rotation.x = degreesToRadians(8);
-  group.rotation.z = degreesToRadians(-6);
   return group;
 }
 
@@ -190,10 +187,6 @@ function disposeGroup(group: Group | undefined): void {
 
     object.material.dispose();
   });
-}
-
-function degreesToRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
 }
 </script>
 

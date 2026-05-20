@@ -1,3 +1,4 @@
+import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import {
   calculateSmoothingAlpha,
@@ -11,13 +12,22 @@ describe("orientation math", () => {
     expect(normalizeDegrees(-181)).toBe(179);
   });
 
-  it("creates a stable identity quaternion for a level sensor", () => {
+  it("maps a level sensor to a flat display-up model pose", () => {
     const quaternion = createSensorOrientationQuaternion({ pitch: 0, roll: 0, yaw: 720 });
+    const displayNormal = new Vector3(0, 0, 1).applyQuaternion(quaternion);
 
-    expect(quaternion.x).toBeCloseTo(0);
-    expect(quaternion.y).toBeCloseTo(0);
-    expect(quaternion.z).toBeCloseTo(0);
-    expect(quaternion.w).toBeCloseTo(1);
+    expect(displayNormal.x).toBeCloseTo(0);
+    expect(displayNormal.y).toBeCloseTo(1);
+    expect(displayNormal.z).toBeCloseTo(0);
+  });
+
+  it("keeps yaw rotation around the flat display-up axis", () => {
+    const quaternion = createSensorOrientationQuaternion({ pitch: 0, roll: 0, yaw: 90 });
+    const displayNormal = new Vector3(0, 0, 1).applyQuaternion(quaternion);
+
+    expect(displayNormal.x).toBeCloseTo(0);
+    expect(displayNormal.y).toBeCloseTo(1);
+    expect(displayNormal.z).toBeCloseTo(0);
   });
 
   it("keeps smoothing alpha frame-rate independent and bounded", () => {
