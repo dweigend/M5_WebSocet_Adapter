@@ -10,12 +10,16 @@ import {
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
+  Quaternion,
   Scene,
   WebGLRenderer,
 } from "three";
+import { calculateSmoothingAlpha, createSensorOrientationQuaternion } from "./orientation-math";
 import type { OrientationMessage } from "./protocol";
 
 type Orientation = Pick<OrientationMessage, "pitch" | "roll" | "yaw"> | undefined;
+
+const ORIENTATION_SMOOTHING_SPEED = 12;
 
 interface Props {
   orientation: Orientation;
@@ -27,17 +31,14 @@ let { orientation, safeMode }: Props = $props();
 let canvas: HTMLCanvasElement | undefined = $state();
 let container: HTMLDivElement | undefined = $state();
 let stickModel: Group | undefined;
+let targetOrientation = new Quaternion();
 
 $effect(() => {
-  if (!stickModel || !orientation) {
+  if (!orientation) {
     return;
   }
 
-  stickModel.rotation.set(
-    degreesToRadians(orientation.pitch),
-    degreesToRadians(orientation.yaw),
-    degreesToRadians(orientation.roll),
-  );
+  targetOrientation = createSensorOrientationQuaternion(orientation);
 });
 
 $effect(() => {
@@ -67,7 +68,6 @@ onMount(() => {
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
   scene.add(new AmbientLight(0xffffff, 1.5));
 
@@ -80,7 +80,21 @@ onMount(() => {
   scene.add(fillLight);
 
   stickModel = createStickModel();
+  stickModel.quaternion.copy(targetOrientation);
   scene.add(stickModel);
+
+  let lastRenderAt = performance.now();
+  renderer.setAnimationLoop(() => {
+    const now = performance.now();
+    const deltaSeconds = Math.min(0.1, (now - lastRenderAt) / 1_000);
+    lastRenderAt = now;
+
+    stickModel?.quaternion.slerp(
+      targetOrientation,
+      calculateSmoothingAlpha(deltaSeconds, ORIENTATION_SMOOTHING_SPEED),
+    );
+    renderer.render(scene, camera);
+  });
 
   let lastWidth = 0;
   let lastHeight = 0;
