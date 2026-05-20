@@ -1,9 +1,13 @@
 node_modules/
+.venv/
+__pycache__/
+firmware/.pio/
 .svelte-kit/
 .vite/
 build/
 dist/
 coverage/
+serial-probe-logs/
 *.local
 .DS_Store
 *.log

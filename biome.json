@@ -2,7 +2,17 @@
   "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!node_modules", "!.svelte-kit", "!build", "!dist", "!coverage"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.venv",
+      "!firmware/.pio",
+      "!serial-probe-logs",
+      "!.svelte-kit",
+      "!build",
+      "!dist",
+      "!coverage"
+    ]
   },
   "formatter": {
     "enabled": true,
