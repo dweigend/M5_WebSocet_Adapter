@@ -51,6 +51,7 @@ export interface UsbTestSessionState {
 }
 
 type UsbStateListener = (state: UsbTestSessionState) => void;
+type RawFrameInput = Omit<RawSerialEntry, "id">;
 
 export class UsbTestSession {
   readonly #registry = new DeviceRegistry();
@@ -179,19 +180,15 @@ export class UsbTestSession {
     receivedAt: number,
     rawLine = JSON.stringify(result),
   ): void {
-    const rawEntry = this.#createRawEntry({
-      line: rawLine,
-      receivedAt,
-      valid: true,
-      frameType: "configureResult",
-    });
-
     this.#patchState({
+      ...this.#recordRawFrame({
+        line: rawLine,
+        receivedAt,
+        valid: true,
+        frameType: "configureResult",
+      }),
       configureResult: result,
       message: result.message,
-      rawLines: prependRawLine(this.#state.rawLines, rawEntry),
-      frameCounters: incrementFrameCounter(this.#state.frameCounters, "configureResult"),
-      validFrameCount: this.#state.validFrameCount + 1,
       lastFrameAt: receivedAt,
     });
   }
@@ -209,22 +206,18 @@ export class UsbTestSession {
 
   #recordDeviceMessage(line: string, message: DeviceMessage, receivedAt: number): void {
     const update = this.#registry.upsertFromMessage(message, receivedAt);
-    if (message.type === "imu" || message.type === "orientation") {
+    if (isTelemetryFrame(message)) {
       this.#telemetryFrameTimes.push(receivedAt);
     }
 
-    const rawEntry = this.#createRawEntry({
-      line,
-      receivedAt,
-      valid: true,
-      frameType: message.type,
-    });
-
     this.#patchState({
+      ...this.#recordRawFrame({
+        line,
+        receivedAt,
+        valid: true,
+        frameType: message.type,
+      }),
       devices: upsertDeviceSnapshot(this.#state.devices, update.snapshot),
-      rawLines: prependRawLine(this.#state.rawLines, rawEntry),
-      frameCounters: incrementFrameCounter(this.#state.frameCounters, message.type),
-      validFrameCount: this.#state.validFrameCount + 1,
       lastFrameAt: receivedAt,
       telemetryRateHz: calculateTelemetryRate(this.#telemetryFrameTimes, receivedAt),
       message: `USB telemetry received from ${message.deviceId}.`,
@@ -232,21 +225,35 @@ export class UsbTestSession {
   }
 
   #recordInvalidLine(line: string, receivedAt: number, parseError: string): void {
-    const rawEntry = this.#createRawEntry({
-      line,
-      receivedAt,
-      valid: false,
-      frameType: "unsupported",
-      parseError,
-    });
-
     this.#patchState({
-      rawLines: prependRawLine(this.#state.rawLines, rawEntry),
-      frameCounters: incrementFrameCounter(this.#state.frameCounters, "unsupported"),
-      invalidLineCount: this.#state.invalidLineCount + 1,
+      ...this.#recordRawFrame({
+        line,
+        receivedAt,
+        valid: false,
+        frameType: "unsupported",
+        parseError,
+      }),
       lastParseError: parseError,
       message: parseError,
     });
+  }
+
+  #recordRawFrame(input: RawFrameInput): Partial<UsbTestSessionState> {
+    const rawEntry = this.#createRawEntry(input);
+
+    if (!input.valid) {
+      return {
+        rawLines: prependRawLine(this.#state.rawLines, rawEntry),
+        frameCounters: incrementFrameCounter(this.#state.frameCounters, input.frameType),
+        invalidLineCount: this.#state.invalidLineCount + 1,
+      };
+    }
+
+    return {
+      rawLines: prependRawLine(this.#state.rawLines, rawEntry),
+      frameCounters: incrementFrameCounter(this.#state.frameCounters, input.frameType),
+      validFrameCount: this.#state.validFrameCount + 1,
+    };
   }
 
   async #runSerialAction(action: () => Promise<void>, fallbackMessage: string): Promise<void> {
@@ -265,7 +272,7 @@ export class UsbTestSession {
     }
   }
 
-  #createRawEntry(input: Omit<RawSerialEntry, "id">): RawSerialEntry {
+  #createRawEntry(input: RawFrameInput): RawSerialEntry {
     const id = this.#nextRawLineId;
     this.#nextRawLineId += 1;
     return { id, ...input };
@@ -330,6 +337,10 @@ function upsertDeviceSnapshot(
   }
 
   return devices.map((device) => (device.deviceId === nextDevice.deviceId ? nextDevice : device));
+}
+
+function isTelemetryFrame(message: DeviceMessage): boolean {
+  return message.type === "imu" || message.type === "orientation";
 }
 
 function calculateTelemetryRate(frameTimes: number[], timestamp: number): number {

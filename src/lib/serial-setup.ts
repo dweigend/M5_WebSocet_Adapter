@@ -1,11 +1,14 @@
 import type { DeviceCommandType } from "./protocol";
 
-const M5_SERIAL_FILTERS = [
+export const M5_SERIAL_PORT_FILTERS = [
   { usbVendorId: 0x1a86, usbProductId: 0x55d4 },
   { usbVendorId: 0x1a86, usbProductId: 0x7523 },
   { usbVendorId: 0x1a86 },
   { usbVendorId: 0x10c4 },
 ];
+
+const WEB_SERIAL_CHOOSER_DIAGNOSTIC =
+  "If Chrome closes on macOS while opening the chooser, see USB_CONNECT_CRASH_REPORT.md for the Bluetooth/TCC chooser crash.";
 
 export interface ConfigureRequest {
   type: "configure";
@@ -49,17 +52,17 @@ interface SerialPortSignalsLike {
   ringIndicator?: boolean;
 }
 
-interface SerialLike {
+export interface SerialLike {
   getPorts: () => Promise<SerialPortLike[]>;
   requestPort: (options?: { filters?: SerialPortFilterLike[] }) => Promise<SerialPortLike>;
 }
 
-interface SerialPortFilterLike {
+export interface SerialPortFilterLike {
   usbVendorId: number;
   usbProductId?: number;
 }
 
-interface SerialPortLike {
+export interface SerialPortLike {
   readable: ReadableStream<Uint8Array> | null;
   writable: WritableStream<Uint8Array> | null;
   open: (options: { baudRate: number }) => Promise<void>;
@@ -93,6 +96,10 @@ export function serializeConfigureRequest(request: ConfigureRequest): string {
   return `${JSON.stringify(request)}\n`;
 }
 
+export function serializeCommandRequest(type: DeviceCommandType): string {
+  return `${JSON.stringify({ type })}\n`;
+}
+
 export function parseConfigureResult(line: string): ConfigureResult | undefined {
   try {
     const parsed = JSON.parse(line) as Partial<ConfigureResult>;
@@ -124,6 +131,19 @@ export function formatSerialTestResult(result: SerialTestResult): string {
   return `USB serial opened at ${result.baudRate} baud. Readable: ${
     result.readable ? "yes" : "no"
   }. Writable: ${result.writable ? "yes" : "no"}.${usbInfo}`;
+}
+
+export function formatSerialPortRequestError(error: unknown): string {
+  if (
+    typeof DOMException !== "undefined" &&
+    error instanceof DOMException &&
+    error.name === "NotFoundError"
+  ) {
+    return "No serial port selected.";
+  }
+
+  const message = error instanceof Error ? error.message : "Could not request a serial port.";
+  return `${message} ${WEB_SERIAL_CHOOSER_DIAGNOSTIC}`;
 }
 
 export class SerialSetupConnection {
@@ -195,7 +215,7 @@ export class SerialSetupConnection {
       throw new Error("Serial port is not connected.");
     }
 
-    await this.#writer.write(new TextEncoder().encode(`${JSON.stringify({ type })}\n`));
+    await this.#writer.write(new TextEncoder().encode(serializeCommandRequest(type)));
   }
 
   async disconnect(): Promise<void> {
@@ -288,6 +308,10 @@ export class SerialSetupConnection {
 
 async function findM5SerialPort(): Promise<SerialPortLike> {
   const serial = getSerialApi();
+  return selectM5SerialPort(serial);
+}
+
+export async function selectM5SerialPort(serial: SerialLike): Promise<SerialPortLike> {
   const grantedPorts = await serial.getPorts();
   const matchingGrantedPort = grantedPorts.find(isLikelyM5SerialPort);
 
@@ -295,17 +319,21 @@ async function findM5SerialPort(): Promise<SerialPortLike> {
     return matchingGrantedPort;
   }
 
-  return serial.requestPort({ filters: M5_SERIAL_FILTERS });
+  try {
+    return await serial.requestPort({ filters: M5_SERIAL_PORT_FILTERS });
+  } catch (error) {
+    throw new Error(formatSerialPortRequestError(error));
+  }
 }
 
-function isLikelyM5SerialPort(port: SerialPortLike): boolean {
+export function isLikelyM5SerialPort(port: SerialPortLike): boolean {
   const info = port.getInfo?.();
 
   if (!info?.usbVendorId) {
     return false;
   }
 
-  return M5_SERIAL_FILTERS.some((filter) => {
+  return M5_SERIAL_PORT_FILTERS.some((filter) => {
     if (filter.usbVendorId !== info.usbVendorId) {
       return false;
     }
