@@ -12,9 +12,11 @@
     "test": "vitest run && bun run verify:integration",
     "simulate:device": "bun run scripts/simulate-device.ts",
     "verify:integration": "bun run scripts/verify-integration.ts",
-    "firmware:build": "pio run -d firmware",
-    "firmware:upload": "pio run -d firmware --target upload",
-    "firmware:monitor": "pio device monitor -d firmware --baud 115200"
+    "tools:setup": "uv venv --allow-existing .venv && uv pip install --python .venv/bin/python -r requirements-controller.txt",
+    "serial:probe": ".venv/bin/python scripts/probe-m5stick-serial.py",
+    "firmware:build": ".venv/bin/pio run -d firmware",
+    "firmware:upload": ".venv/bin/pio run -d firmware --target upload",
+    "firmware:monitor": ".venv/bin/pio device monitor -d firmware --baud 115200"
   },
   "dependencies": {
     "lucide-svelte": "^1.0.1",

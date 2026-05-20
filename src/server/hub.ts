@@ -72,16 +72,7 @@ export function startHub(options: HubOptions = {}): RunningHub {
           return;
         }
 
-        const deviceId = ws.data.deviceId;
-        if (!deviceId) {
-          return;
-        }
-
-        deviceSockets.delete(deviceId);
-        const snapshot = registry.markDisconnected(deviceId, Date.now());
-        if (snapshot) {
-          publishToUi(server, { type: "deviceStatus", device: snapshot });
-        }
+        handleDeviceSocketClose(ws, registry, deviceSockets, server);
       },
     },
   });
@@ -103,6 +94,24 @@ export function startHub(options: HubOptions = {}): RunningHub {
       server.stop(true);
     },
   };
+}
+
+function handleDeviceSocketClose(
+  ws: HubWebSocket,
+  registry: DeviceRegistry,
+  deviceSockets: Map<string, HubWebSocket>,
+  server: Bun.Server<ClientData>,
+): void {
+  const deviceId = ws.data.deviceId;
+  if (!deviceId || deviceSockets.get(deviceId) !== ws) {
+    return;
+  }
+
+  deviceSockets.delete(deviceId);
+  const snapshot = registry.markDisconnected(deviceId, Date.now());
+  if (snapshot) {
+    publishToUi(server, { type: "deviceStatus", device: snapshot });
+  }
 }
 
 function upgrade(
@@ -168,16 +177,20 @@ function forwardCommand(
   const deviceSocket = deviceSockets.get(command.deviceId);
 
   if (!deviceSocket) {
-    uiSocket.send(
-      serializeUiMessage({
-        type: "error",
-        error: { code: "invalid_shape", message: "Target device is not connected." },
-      }),
-    );
+    sendTargetDisconnectedError(uiSocket);
     return;
   }
 
   deviceSocket.send(serializeUiMessage({ type: command.type }));
+}
+
+function sendTargetDisconnectedError(uiSocket: HubWebSocket): void {
+  uiSocket.send(
+    serializeUiMessage({
+      type: "error",
+      error: { code: "invalid_shape", message: "Target device is not connected." },
+    }),
+  );
 }
 
 function publishToUi(server: Bun.Server<ClientData>, message: unknown): void {

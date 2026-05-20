@@ -26,6 +26,7 @@ The server is the local authority. The M5Stick is a sensor appliance. Future VR 
 - WebSocket: `arduinoWebSockets`.
 - JSON: `ArduinoJson`.
 - Persistent config: `Preferences`.
+- Tooling: `uv` creates `.venv`; firmware commands use `.venv/bin/pio`.
 
 Firmware responsibilities:
 
@@ -194,7 +195,7 @@ Firmware to UI:
 - UI latency: orientation data appears in the browser typically within 100 ms after server receipt.
 - Fault detection: WiFi or server outage is visible in firmware/UI status within 3 seconds.
 - Recovery: after server restart, the Stick reconnects within 10 seconds.
-- Checks: `bun run lint`, `bun run check`, `bun run build`, `bun run test`, and `pio run` pass where tooling is available.
+- Checks: `bun run lint`, `bun run check`, `bun run build`, `bun run test`, and `bun run firmware:build` pass where tooling is available.
 
 ## Implementation Boundaries
 

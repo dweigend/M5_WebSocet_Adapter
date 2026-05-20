@@ -9,7 +9,7 @@
 - [x] WP4: Web Serial setup UI is implemented.
 - [x] WP5: Three.js live test UI is implemented.
 - [x] WP6: End-to-end integration pass is complete.
-- [x] WP7: Verification and final documentation are complete.
+- [x] WP7: Software verification and final documentation are complete.
 - [x] WP8: USB test mode treats Web Serial as a first-class telemetry transport.
 
 ## WP0: Coordination Files
@@ -115,7 +115,7 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] `pio run` succeeds where PlatformIO is available.
+- [x] `bun run firmware:build` succeeds with uv-managed PlatformIO.
 - [x] Main loop has no long blocking `delay()` in normal operation.
 - [x] `M5.update()` runs every loop.
 - [x] `webSocket.loop()` runs whenever WebSocket is active.
@@ -133,7 +133,7 @@ Integration notes:
 
 - `firmware/platformio.ini` targets ESP32 Arduino with `M5Unified`, `arduinoWebSockets`, and `ArduinoJson`.
 - `firmware/src/main.cpp` uses `Preferences` for `ssid`, `password`, `serverUrl`, and `deviceId`.
-- `pio` was not available in `PATH` during the 2026-05-20 integration session, so `pio run` is not verified locally.
+- Global `pio` is not required. Firmware tooling is installed with `uv` and verified through `bun run firmware:build`.
 
 ## WP4: Web Serial Setup UI
 
@@ -249,7 +249,7 @@ Acceptance criteria:
 - [x] `bun run check` result recorded.
 - [x] `bun run build` result recorded.
 - [x] `bun run test` result recorded.
-- [x] `pio run` result recorded or PlatformIO absence documented.
+- [x] `bun run firmware:build` result recorded.
 - [x] `git status --short --branch` is clean or intentional changes are listed.
 
 Verification results from 2026-05-20 integration session:
@@ -259,7 +259,7 @@ Verification results from 2026-05-20 integration session:
 - `bun run build`: passed.
 - `bun run test`: passed; includes Vitest plus the Bun WebSocket integration harness.
 - `bun run verify:integration`: passed.
-- `pio run`: not run because `pio` was not available in `PATH`; documented in `README.md` and `firmware/README.md`.
+- `bun run firmware:build`: passed with uv-managed PlatformIO.
 - `git status --short --branch`: expected clean after the final integration commit.
 
 ## WP8: USB Test Mode
@@ -289,7 +289,7 @@ Acceptance criteria:
 - [x] Source is shown as `usb`, `hub`, or `both`.
 - [x] Commands prefer USB for USB-sourced devices and fall back to hub when USB is unavailable.
 - [x] Unit tests cover USB session parsing, ringbuffer behavior, frame counters, and command routing.
-- [ ] Hardware verification on a real M5StickC Plus2 remains open.
+- [ ] Final hardware verification on a real M5StickC Plus2 remains open.
 
 ## Parallelization Rules
 

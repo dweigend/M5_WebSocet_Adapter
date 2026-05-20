@@ -33,9 +33,41 @@ try {
   uiSocket.send(JSON.stringify({ type: "identify", deviceId: "m5stick-plus2-sim" }));
   await forwardedCommand;
 
-  uiSocket.close();
+  const replacementDeviceSocket = await openSocket(getHubWebSocketUrl(hub, "/ws/device"));
+  const replacementUpdate = waitForMessage(
+    uiSocket,
+    (message) => message.type === "deviceUpdate" && getDeviceId(message) === "m5stick-plus2-sim",
+  );
+
+  replacementDeviceSocket.send(
+    JSON.stringify({
+      type: "orientation",
+      deviceId: "m5stick-plus2-sim",
+      role: "controller",
+      seq: 2,
+      timeMs: 40,
+      pitch: 2.1,
+      roll: -1.4,
+      yaw: 0.7,
+      quality: 1,
+    }),
+  );
+
+  await replacementUpdate;
   deviceSocket.close();
-  console.info("Integration verification passed: telemetry broadcast and command forwarding work.");
+
+  const replacementCommand = waitForMessage(
+    replacementDeviceSocket,
+    (message) => message.type === "identify",
+  );
+  uiSocket.send(JSON.stringify({ type: "identify", deviceId: "m5stick-plus2-sim" }));
+  await replacementCommand;
+
+  uiSocket.close();
+  replacementDeviceSocket.close();
+  console.info(
+    "Integration verification passed: telemetry broadcast, command forwarding, and reconnect handoff work.",
+  );
 } finally {
   hub.stop();
 }

@@ -1,7 +1,7 @@
 const serverUrl = process.env.DEVICE_WS_URL ?? "ws://localhost:8787/ws/device";
 const deviceId = process.env.DEVICE_ID ?? "m5stick-plus2-sim";
-const messageRate = Number(process.env.MESSAGE_RATE ?? 50);
-const durationMs = Number(process.env.DURATION_MS ?? 2_000);
+const messageRate = readPositiveNumberEnv("MESSAGE_RATE", 50);
+const durationMs = readPositiveNumberEnv("DURATION_MS", 2_000);
 const intervalMs = 1_000 / messageRate;
 
 let seq = 1;
@@ -54,4 +54,18 @@ function send(payload: Record<string, unknown>): void {
   );
   seq += 1;
   sentMessages += 1;
+}
+
+function readPositiveNumberEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const value = Number(rawValue);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number.`);
+  }
+
+  return value;
 }

@@ -1,162 +1,166 @@
 # Session Prompts
 
-Use these prompts to start separate implementation sessions. Each session must read `README.md`, `PLAN.md`, and `TODO.md` before making changes.
+These prompts are maintainer notes for splitting implementation work into focused sessions. They are
+not required reading for students who only want to run the project. Start with `README.md` and
+`docs/controller-setup.md` for normal use.
 
 ## Session A: Repository And Server
 
 ```text
-Bitte starte eine Build-Session im Projekt /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
+Start a build session in /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
 
-Lies zuerst README.md, PLAN.md und TODO.md vollständig. Arbeite dann nur an WP1 und WP2 aus TODO.md.
+Read README.md, PLAN.md, and TODO.md first. Work only on WP1 and WP2 from TODO.md.
 
-Ziele dieser Session:
-- Git initialisieren, falls noch nicht vorhanden.
-- Bun/SvelteKit/Svelte 5/TypeScript Projekt-Skeleton einrichten.
-- Biome, Vitest, Three.js, Lucide und Svelte-Checks konfigurieren.
-- Bun-nativen WebSocket-Hub bauen.
-- /ws/device und /ws/ui implementieren.
-- JSON-Protokoll typisieren und validieren.
-- Device-State, Heartbeat-/Timeout-Status, Sequenzprüfung, Paketverlust-Schätzung und Broadcast an UI-Clients implementieren.
-- Unit-Tests für Protokollvalidierung und Device-State schreiben.
+Goals:
+- Initialize Git if needed.
+- Create the Bun/SvelteKit/Svelte 5/TypeScript project skeleton.
+- Configure Biome, Vitest, Three.js, Lucide, and Svelte checks.
+- Build the Bun-native WebSocket hub.
+- Implement /ws/device and /ws/ui.
+- Type and validate the JSON protocol.
+- Implement device state, heartbeat timeout status, sequence checks, packet-loss estimates, and UI broadcasts.
+- Write unit tests for protocol validation and device state.
 
-Nicht tun:
-- Nicht an firmware/ arbeiten, außer falls eine leere Platzhalterstruktur bereits existiert.
-- Keine UI-Features bauen außer minimalem Skeleton, falls SvelteKit es braucht.
-- Keine neuen Backend-Frameworks einführen.
+Do not:
+- Work in firmware/ except for placeholder structure if needed.
+- Build UI features beyond a minimal SvelteKit skeleton.
+- Add a backend framework.
 
-Klare Zielmetriken:
-- bun run lint erfolgreich.
-- bun run check erfolgreich.
-- bun run build erfolgreich.
-- bun run test erfolgreich.
-- Simulierter Device-Stream mit mindestens 50 Nachrichten/Sekunde lokal verarbeitbar.
-- Safe Mode wird nach mehr als 3 Sekunden ohne frische Telemetrie gesetzt.
+Done means:
+- bun run lint passes.
+- bun run check passes.
+- bun run build passes.
+- bun run test passes.
+- A simulated device stream can process at least 50 messages per second locally.
+- Safe mode is set after more than 3 seconds without fresh telemetry.
 
-Vor Änderungen git status prüfen. Am Ende einen sinnvollen Commit mit englischer Commit Message erstellen.
+Check git status before editing. Finish with a focused English commit message.
 ```
 
 ## Session B: Firmware
 
 ```text
-Bitte starte eine Build-Session im Projekt /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
+Start a build session in /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
 
-Lies zuerst README.md, PLAN.md und TODO.md vollständig. Arbeite dann nur an WP3 aus TODO.md.
+Read README.md, PLAN.md, and TODO.md first. Work only on WP3 from TODO.md.
 
-Ziele dieser Session:
-- firmware/ als PlatformIO-Projekt für M5StickC Plus2 einrichten.
-- M5Unified, WiFi.h, arduinoWebSockets, ArduinoJson und Preferences verwenden.
-- Web Serial Setup mit newline-delimited JSON implementieren.
-- SSID, Passwort, Server-URL und Device-ID in Preferences speichern und laden.
-- Non-blocking WiFi-Reconnect und WebSocket-Reconnect getrennt behandeln.
-- register, heartbeat, imu und orientation Frames senden.
-- calibrate, pause, resume, reboot und identify Commands empfangen und ausführen.
-- Display-Diagnose für Status, IP, RSSI und Streaming-Zustand anzeigen.
+Goals:
+- Create firmware/ as a PlatformIO project for M5StickC Plus2.
+- Use M5Unified, WiFi.h, arduinoWebSockets, ArduinoJson, and Preferences.
+- Use uv-managed tools only: .venv/bin/pio and .venv/bin/python.
+- Implement Web Serial setup with newline-delimited JSON.
+- Store and load SSID, password, server URL, and device ID in Preferences.
+- Keep WiFi reconnect and WebSocket reconnect separate and non-blocking.
+- Send register, heartbeat, imu, and orientation frames.
+- Receive and execute calibrate, pause, resume, reboot, and identify commands.
+- Show display status for headless operation.
 
-Nicht tun:
-- Nicht an Svelte UI oder Server-Dateien arbeiten.
-- Keine langen delay()-Blöcke im normalen Loop.
-- Keine direkte VR-Steuerung bauen.
+Do not:
+- Work on Svelte UI or server files.
+- Add long delay() blocks to the normal loop.
+- Build direct VR control.
 
-Klare Zielmetriken:
-- pio run erfolgreich, wenn PlatformIO verfügbar ist.
-- M5.update() läuft in jeder Loop-Iteration.
-- webSocket.loop() läuft regelmäßig, sobald WebSocket aktiv ist.
-- Heartbeat alle 2 Sekunden.
-- IMU-Zielintervall 20 ms.
-- WiFi/WebSocket verbindet innerhalb von 10 Sekunden nach gespeicherter Config unter normalen lokalen Bedingungen.
-- Verbindungsverlust wird innerhalb von 3 Sekunden sichtbar.
+Done means:
+- bun run tools:setup passes.
+- bun run firmware:build passes when firmware tooling is available.
+- M5.update() runs in every loop iteration.
+- webSocket.loop() runs regularly when WebSocket is active.
+- Heartbeat is sent every 2 seconds.
+- IMU target interval is 20 ms.
+- WiFi/WebSocket connects within 10 seconds after saved config under normal local conditions.
+- Connection loss is visible within 3 seconds.
 
-Vor Änderungen git status prüfen. Am Ende einen sinnvollen Commit mit englischer Commit Message erstellen.
+Check git status before editing. Finish with a focused English commit message.
 ```
 
 ## Session C: Setup And Test UI
 
 ```text
-Bitte starte eine Build-Session im Projekt /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
+Start a build session in /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
 
-Lies zuerst README.md, PLAN.md und TODO.md vollständig. Arbeite dann nur an WP4 und WP5 aus TODO.md.
+Read README.md, PLAN.md, and TODO.md first. Work only on WP4 and WP5 from TODO.md.
 
-Ziele dieser Session:
-- SvelteKit/Svelte 5 UI für Setup und Testoberfläche bauen.
-- Web Serial Connect/Disconnect implementieren.
-- Formular für SSID, Passwort, Server-URL und Device-ID bauen.
-- Configure-JSON als newline-delimited JSON an den Stick senden.
-- configureResult anzeigen.
-- /ws/ui WebSocket-Client bauen.
-- Live Device-Status anzeigen: connected, calibrated, RSSI, heap, battery, packet loss, last message.
-- Three.js-Orientation-Visualisierung mit Stick-Modell bauen.
-- Control-Buttons für calibrate, pause, resume, identify und reboot bauen.
-- Safe Mode bei veralteten oder ungültigen Daten anzeigen.
+Goals:
+- Build the SvelteKit/Svelte 5 setup and diagnostics UI.
+- Implement Web Serial connect/disconnect.
+- Build the form for SSID, password, server URL, and device ID.
+- Send configure JSON as newline-delimited JSON to the Stick.
+- Show configureResult.
+- Build the /ws/ui WebSocket client.
+- Show live device status: connected, calibrated, RSSI, heap, battery, packet loss, and last message.
+- Build the Three.js orientation visualization with a Stick model.
+- Add controls for calibrate, pause, resume, identify, and reboot.
+- Show safe mode for stale or invalid data.
 
-Design- und Code-Regeln:
-- Zentrale Styles in src/app.css.
-- Keine Inline-Styles.
-- Keine Tailwind Utility Classes im Markup.
-- Lucide Icons verwenden, wo passend.
-- Three.js nur im Browser/onMount initialisieren.
-- Renderer und Event Listener beim Unmount sauber freigeben.
+Design and code rules:
+- Keep styles in src/app.css.
+- Do not use inline styles.
+- Do not use Tailwind utility classes in markup.
+- Use Lucide icons where useful.
+- Initialize Three.js only in the browser/onMount.
+- Dispose renderers and event listeners on unmount.
 
-Nicht tun:
-- Nicht an firmware/ arbeiten.
-- Nicht die Server-Protokollform eigenmächtig ändern; bei Bedarf TODO/PLAN respektieren und kleine Integrationsnotiz hinterlassen.
+Do not:
+- Work in firmware/.
+- Change the server protocol shape without updating PLAN.md/TODO.md and leaving a short integration note.
 
-Klare Zielmetriken:
-- bun run lint erfolgreich.
-- bun run check erfolgreich.
-- bun run build erfolgreich.
-- bun run test erfolgreich.
-- Setup kann mit angeschlossenem Stick in unter 60 Sekunden abgeschlossen werden.
-- UI zeigt Safe Mode innerhalb von 3 Sekunden nach Telemetrieausfall.
+Done means:
+- bun run lint passes.
+- bun run check passes.
+- bun run build passes.
+- bun run test passes.
+- Setup can be completed with a connected Stick in under 60 seconds.
+- The UI shows safe mode within 3 seconds after telemetry stops.
 
-Vor Änderungen git status prüfen. Am Ende einen sinnvollen Commit mit englischer Commit Message erstellen.
+Check git status before editing. Finish with a focused English commit message.
 ```
 
 ## Integration Session
 
 ```text
-Bitte starte eine Integration-Session im Projekt /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
+Start an integration session in /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
 
-Lies zuerst README.md, PLAN.md und TODO.md vollständig. Prüfe dann die Ergebnisse von Session A, B und C gegen WP6 und WP7 aus TODO.md.
+Read README.md, PLAN.md, and TODO.md first. Verify Session A, B, and C against WP6 and WP7 in TODO.md.
 
-Ziele dieser Session:
-- Server-, Firmware- und UI-Protokollformen end-to-end abgleichen.
-- Web Serial Configure-JSON gegen Firmware-Parser prüfen.
-- Simulierten WebSocket-Device-Stream durch den Server bis zur UI testen.
-- Command-Frames von UI über Server an Device-Verbindung prüfen.
-- README mit genauen Start-, Build-, Upload- und Monitor-Kommandos aktualisieren.
-- Refactor-Pass für klare Dateigrenzen, Namensgebung und einfache Struktur durchführen.
-- Alle verfügbaren Checks ausführen.
+Goals:
+- Align server, firmware, and UI protocol shapes end to end.
+- Check Web Serial configure JSON against the firmware parser.
+- Test simulated WebSocket telemetry through the server to the UI socket.
+- Test command frames from UI through the server to the device connection.
+- Update README with exact start, build, upload, and monitor commands.
+- Run a refactor pass for clear file boundaries, naming, and simple structure.
+- Run all available checks.
 
-Klare Zielmetriken:
-- bun run lint erfolgreich.
-- bun run check erfolgreich.
-- bun run build erfolgreich.
-- bun run test erfolgreich.
-- pio run erfolgreich oder PlatformIO-Abwesenheit klar dokumentiert.
-- Safe Mode nach mehr als 3 Sekunden ohne Telemetrie.
-- Stick reconnectet nach Server-Neustart innerhalb von 10 Sekunden, wenn Hardwaretest möglich ist.
-- git status ist am Ende sauber oder absichtlich offene Änderungen sind dokumentiert.
+Done means:
+- bun run lint passes.
+- bun run check passes.
+- bun run build passes.
+- bun run test passes.
+- bun run firmware:build passes when firmware tooling is available.
+- Safe mode appears after more than 3 seconds without telemetry.
+- The Stick reconnects within 10 seconds after a server restart when hardware testing is possible.
+- git status is clean or intentionally open changes are documented.
 
-Am Ende einen sinnvollen Commit mit englischer Commit Message erstellen.
+Finish with a focused English commit message.
 ```
 
 ## Supervisor Session
 
 ```text
-Bitte überwache das Projekt /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter als Supervisor-Session.
+Supervise /Volumes/SSD_Data/GitBase/M5_WebSocet_Adapter.
 
-Lies README.md, PLAN.md, TODO.md und SESSION_PROMPTS.md. Implementiere keine Feature-Arbeit, außer ich fordere es ausdrücklich an.
+Read README.md, PLAN.md, TODO.md, and SESSION_PROMPTS.md. Do not implement feature work unless the user explicitly asks for it.
 
-Aufgaben:
-- Prüfe den Fortschritt gegen TODO.md.
-- Lies git status und die jüngsten Commits.
-- Identifiziere blockierende Abweichungen zwischen Session A, B, C und Integration.
-- Aktualisiere TODO.md nur für Status/Koordination, nicht für Feature-Implementierung.
-- Gib mir kurze deutsche Statusberichte mit offenen Risiken, nächstem sinnvollem Schritt und fehlenden Checks.
+Tasks:
+- Check progress against TODO.md.
+- Read git status and recent commits.
+- Identify blocking mismatches between Session A, B, C, and integration work.
+- Update TODO.md only for status/coordination, not feature implementation.
+- Give short German status reports with open risks, the next useful step, and missing checks.
 
-Klare Zielmetriken:
-- Jede Session bleibt in ihrem Write Scope.
-- Akzeptanzkriterien aus TODO.md werden sichtbar abgehakt.
-- Abweichungen vom PLAN.md werden früh erkannt.
-- Keine Feature-Implementierung durch die Supervisor-Session ohne explizite Freigabe.
+Done means:
+- Each session stays inside its write scope.
+- Acceptance criteria from TODO.md are visibly checked.
+- Deviations from PLAN.md are found early.
+- No supervisor feature implementation happens without explicit approval.
 ```

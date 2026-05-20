@@ -1,5 +1,8 @@
 # USB Serial Diagnostic Report
 
+This is a historical local investigation, not the normal setup guide. Start with
+`README.md` and `docs/controller-setup.md` for current student-facing instructions.
+
 Date: 2026-05-20
 
 ## Goal
