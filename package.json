@@ -9,7 +9,7 @@
     "lint": "biome check .",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "build": "vite build",
-    "test": "vitest run",
+    "test": "vitest run && bun run verify:integration",
     "simulate:device": "bun run scripts/simulate-device.ts",
     "verify:integration": "bun run scripts/verify-integration.ts"
   },

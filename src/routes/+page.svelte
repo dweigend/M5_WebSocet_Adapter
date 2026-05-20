@@ -70,7 +70,12 @@ $effect(() => {
     ? "Ready to connect a Stick over USB serial."
     : "Web Serial is unavailable in this browser.";
 
-  uiSocket = new UiTelemetrySocket(createUiWebSocketUrl(window.location));
+  uiSocket = new UiTelemetrySocket(
+    createUiWebSocketUrl(window.location, {
+      hubUrl: import.meta.env.PUBLIC_M5_HUB_URL,
+      hubPort: import.meta.env.PUBLIC_M5_HUB_PORT,
+    }),
+  );
   const unsubscribe = [
     uiSocket.on("open", () => {
       uiConnected = true;

@@ -38,6 +38,10 @@ Run the SvelteKit UI:
 bun run dev
 ```
 
+By default, the UI connects to `ws://<current-host>:8787/ws/ui`. Override the hub connection with
+`PUBLIC_M5_HUB_PORT=8788 bun run dev`, `PUBLIC_M5_HUB_URL=ws://127.0.0.1:8788/ws/ui bun run dev`,
+or a browser URL such as `http://localhost:5173/?hubPort=8788`.
+
 Run the Bun WebSocket hub in a second terminal:
 
 ```sh
@@ -64,6 +68,9 @@ bun run check
 bun run build
 bun run test
 ```
+
+`bun run test` runs the Vitest unit suite and then the Bun integration harness so the WebSocket hub
+telemetry happy path and command forwarding are covered in the regular test command.
 
 ## Firmware
 

@@ -229,7 +229,8 @@ Integration notes:
 - Web Serial sends exactly one newline-delimited `configure` JSON object with `ssid`, `password`, `serverUrl`, and `deviceId`; firmware parses the same keys and replies with `configureResult`.
 - Device frames `register`, `heartbeat`, `imu`, and `orientation` match `src/lib/protocol.ts` and firmware emitters.
 - UI commands include `deviceId`; the server validates the target and forwards command frames without `deviceId`, matching the firmware parser.
-- `bun run verify:integration` verifies sample orientation telemetry from a simulated device through the hub to a UI socket and verifies `identify` command forwarding back to the device socket.
+- `bun run test` runs Vitest and then `bun run verify:integration`, so the Bun-only hub WebSocket happy path is part of the regular test command instead of a skipped Vitest suite.
+- `bun run verify:integration` remains available as a focused integration check for sample orientation telemetry from a simulated device through the hub to a UI socket and `identify` command forwarding back to the device socket.
 
 ## WP7: Final Verification
 
@@ -255,7 +256,7 @@ Verification results from 2026-05-20 integration session:
 - `bun run lint`: passed.
 - `bun run check`: passed.
 - `bun run build`: passed.
-- `bun run test`: passed.
+- `bun run test`: passed; includes Vitest plus the Bun WebSocket integration harness.
 - `bun run verify:integration`: passed.
 - `pio run`: not run because `pio` was not available in `PATH`; documented in `README.md` and `firmware/README.md`.
 - `git status --short --branch`: expected clean after the final integration commit.
