@@ -6,8 +6,8 @@
 - [x] WP1: Project skeleton and Git repository are initialized.
 - [x] WP2: Bun WebSocket hub is implemented.
 - [ ] WP3: Firmware skeleton and telemetry loop are implemented.
-- [ ] WP4: Web Serial setup UI is implemented.
-- [ ] WP5: Three.js live test UI is implemented.
+- [x] WP4: Web Serial setup UI is implemented.
+- [x] WP5: Three.js live test UI is implemented.
 - [ ] WP6: End-to-end integration pass is complete.
 - [ ] WP7: Verification and final documentation are complete.
 
@@ -149,11 +149,11 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] UI does not call Web Serial during SSR.
-- [ ] Unsupported browsers show a clear disabled state.
-- [ ] Form sends exactly one newline-delimited JSON configure message.
-- [ ] `configureResult` is displayed.
-- [ ] Serial reader/writer are closed on disconnect/unmount.
+- [x] UI does not call Web Serial during SSR.
+- [x] Unsupported browsers show a clear disabled state.
+- [x] Form sends exactly one newline-delimited JSON configure message.
+- [x] `configureResult` is displayed.
+- [x] Serial reader/writer are closed on disconnect/unmount.
 
 Metrics:
 
@@ -181,12 +181,12 @@ Goals:
 
 Acceptance criteria:
 
-- [ ] Three.js renderer is created only on mount.
-- [ ] Renderer is disposed on unmount.
-- [ ] Canvas resizes without layout jumps.
-- [ ] Orientation updates are applied without recreating the scene.
-- [ ] UI handles disconnected server state.
-- [ ] Control commands include a target `deviceId`.
+- [x] Three.js renderer is created only on mount.
+- [x] Renderer is disposed on unmount.
+- [x] Canvas resizes without layout jumps.
+- [x] Orientation updates are applied without recreating the scene.
+- [x] UI handles disconnected server state.
+- [x] Control commands include a target `deviceId`.
 
 Metrics:
 
