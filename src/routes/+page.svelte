@@ -2,46 +2,24 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Svelte template uses component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Svelte template uses these bindings.
 
-import {
-  Activity,
-  Battery,
-  Cable,
-  CirclePause,
-  CirclePlay,
-  Gauge,
-  Power,
-  Radar,
-  RotateCcw,
-  Send,
-  Server,
-  ShieldAlert,
-  Unplug,
-  Wifi,
-} from "lucide-svelte";
+import { Server } from "lucide-svelte";
 import { browser } from "$app/environment";
 import { type DeviceSnapshot, SAFE_MODE_TIMEOUT_MS } from "$lib/device-state";
-import OrientationScene from "$lib/OrientationScene.svelte";
 import type { DeviceCommandType } from "$lib/protocol";
+import SetupPanel from "$lib/SetupPanel.svelte";
 import {
   type ConfigureResult,
   createConfigureRequest,
   isWebSerialSupported,
   SerialSetupConnection,
 } from "$lib/serial-setup";
+import TelemetryPanel from "$lib/TelemetryPanel.svelte";
 import {
   createUiCommand,
   createUiWebSocketUrl,
   type UiServerMessage,
   UiTelemetrySocket,
 } from "$lib/ui-websocket";
-
-const COMMANDS: Array<{ type: DeviceCommandType; label: string; icon: typeof RotateCcw }> = [
-  { type: "calibrate", label: "Calibrate", icon: RotateCcw },
-  { type: "pause", label: "Pause", icon: CirclePause },
-  { type: "resume", label: "Resume", icon: CirclePlay },
-  { type: "identify", label: "Identify", icon: Radar },
-  { type: "reboot", label: "Reboot", icon: Power },
-];
 
 let ssid = $state("");
 let password = $state("");
@@ -234,22 +212,6 @@ function sendCommand(commandType: DeviceCommandType): void {
     uiMessage = error instanceof Error ? error.message : "Could not send command.";
   }
 }
-
-function formatAge(milliseconds: number | null): string {
-  if (milliseconds === null) {
-    return "never";
-  }
-
-  if (milliseconds < 1_000) {
-    return `${Math.round(milliseconds)} ms`;
-  }
-
-  return `${(milliseconds / 1_000).toFixed(1)} s`;
-}
-
-function formatPercent(value: number | undefined): string {
-  return `${((value ?? 0) * 100).toFixed(1)}%`;
-}
 </script>
 
 <svelte:head>
@@ -269,212 +231,32 @@ function formatPercent(value: number | undefined): string {
   </header>
 
   <section class="dashboard-grid" aria-label="Adapter workspace">
-    <section class="panel setup-panel" aria-labelledby="setup-title">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">WP4</p>
-          <h2 id="setup-title">Serial Setup</h2>
-        </div>
-        <div class:status-pill={true} class:is-live={serialConnected}>
-          <Cable size={16} aria-hidden="true" />
-          <span>{serialConnected ? "Connected" : "Disconnected"}</span>
-        </div>
-      </div>
+    <SetupPanel
+      bind:ssid
+      bind:password
+      bind:serverUrl
+      bind:deviceId
+      {serialSupported}
+      {serialConnected}
+      {serialBusy}
+      {serialMessage}
+      {configureResult}
+      {serialLines}
+      {connectSerial}
+      {disconnectSerial}
+      {submitConfigure}
+    />
 
-      <div class="button-row">
-        <button
-          type="button"
-          class="icon-button"
-          disabled={!serialSupported || serialBusy || serialConnected}
-          onclick={connectSerial}
-          title="Connect serial port"
-        >
-          <Cable size={18} aria-hidden="true" />
-          <span>Connect</span>
-        </button>
-        <button
-          type="button"
-          class="icon-button"
-          disabled={!serialConnected || serialBusy}
-          onclick={disconnectSerial}
-          title="Disconnect serial port"
-        >
-          <Unplug size={18} aria-hidden="true" />
-          <span>Disconnect</span>
-        </button>
-      </div>
-
-      <form class="setup-form" onsubmit={(event) => event.preventDefault()}>
-        <label for="ssid">
-          <span>SSID</span>
-          <input
-            id="ssid"
-            name="ssid"
-            autocomplete="off"
-            bind:value={ssid}
-            disabled={!serialSupported}
-            required
-          />
-        </label>
-        <label for="password">
-          <span>Password</span>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            bind:value={password}
-            disabled={!serialSupported}
-          />
-        </label>
-        <label for="server-url">
-          <span>Server URL</span>
-          <input
-            id="server-url"
-            name="server-url"
-            bind:value={serverUrl}
-            disabled={!serialSupported}
-            required
-          />
-        </label>
-        <label for="device-id">
-          <span>Device ID</span>
-          <input
-            id="device-id"
-            name="device-id"
-            bind:value={deviceId}
-            disabled={!serialSupported}
-            required
-          />
-        </label>
-
-        <button
-          type="button"
-          class="primary-button"
-          disabled={!serialConnected || serialBusy || !ssid.trim() || !serverUrl.trim() || !deviceId.trim()}
-          onclick={submitConfigure}
-        >
-          <Send size={18} aria-hidden="true" />
-          <span>Send Configure</span>
-        </button>
-      </form>
-
-      <div
-        class:result-box={true}
-        class:is-success={configureResult?.ok}
-        class:is-error={configureResult && !configureResult.ok}
-        role="status"
-      >
-        <strong>{configureResult ? "configureResult" : "Serial status"}</strong>
-        <span>{configureResult?.message ?? serialMessage}</span>
-      </div>
-
-      {#if serialLines.length > 0}
-        <ul class="serial-lines" aria-label="Recent serial lines">
-          {#each serialLines as line}
-            <li>{line}</li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-
-    <section class="panel telemetry-panel" aria-labelledby="telemetry-title">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">WP5</p>
-          <h2 id="telemetry-title">Live Telemetry</h2>
-        </div>
-        {#if localSafeMode}
-          <div class="status-pill is-alert">
-            <ShieldAlert size={16} aria-hidden="true" />
-            <span>Safe Mode</span>
-          </div>
-        {/if}
-      </div>
-
-      <div class="telemetry-layout">
-        <div class="visual-stage">
-          <OrientationScene orientation={selectedDevice?.orientation} safeMode={localSafeMode} />
-        </div>
-
-        <div class="device-stack">
-          <label class="device-select" for="device-select">
-            <span>Device</span>
-            <select id="device-select" name="device-select" bind:value={selectedDeviceId} disabled={devices.length === 0}>
-              {#if devices.length === 0}
-                <option value="">No devices</option>
-              {:else}
-                {#each devices as device}
-                  <option value={device.deviceId}>{device.deviceId}</option>
-                {/each}
-              {/if}
-            </select>
-          </label>
-
-          <div class="metric-grid">
-            <article>
-              <Activity size={18} aria-hidden="true" />
-              <span>Connected</span>
-              <strong>{selectedDevice?.connected ? "yes" : "no"}</strong>
-            </article>
-            <article>
-              <RotateCcw size={18} aria-hidden="true" />
-              <span>Calibrated</span>
-              <strong>{selectedDevice?.heartbeat?.calibrated ? "yes" : "no"}</strong>
-            </article>
-            <article>
-              <Wifi size={18} aria-hidden="true" />
-              <span>RSSI</span>
-              <strong>{selectedDevice?.heartbeat?.rssi ?? "-"} dBm</strong>
-            </article>
-            <article>
-              <Gauge size={18} aria-hidden="true" />
-              <span>Heap</span>
-              <strong>{selectedDevice?.heartbeat?.freeHeap ?? "-"} B</strong>
-            </article>
-            <article>
-              <Battery size={18} aria-hidden="true" />
-              <span>Battery</span>
-              <strong>{selectedDevice?.heartbeat?.batteryVoltage?.toFixed(2) ?? "-"} V</strong>
-            </article>
-            <article>
-              <ShieldAlert size={18} aria-hidden="true" />
-              <span>Packet loss</span>
-              <strong>{formatPercent(selectedDevice?.packetLossEstimate)}</strong>
-            </article>
-          </div>
-
-          <dl class="status-list">
-            <div>
-              <dt>Last message</dt>
-              <dd>{formatAge(lastMessageAgeMs)}</dd>
-            </div>
-            <div>
-              <dt>Telemetry age</dt>
-              <dd>{formatAge(localTelemetryAgeMs)}</dd>
-            </div>
-            <div>
-              <dt>Hub status</dt>
-              <dd>{uiMessage}</dd>
-            </div>
-          </dl>
-
-          <div class="command-grid" aria-label="Device controls">
-            {#each COMMANDS as command}
-              <button
-                type="button"
-                class="icon-button"
-                disabled={!canSendCommand}
-                onclick={() => sendCommand(command.type)}
-                title={command.label}
-              >
-                <command.icon size={18} aria-hidden="true" />
-                <span>{command.label}</span>
-              </button>
-            {/each}
-          </div>
-        </div>
-      </div>
-    </section>
+    <TelemetryPanel
+      {devices}
+      bind:selectedDeviceId
+      {selectedDevice}
+      {localSafeMode}
+      {canSendCommand}
+      {lastMessageAgeMs}
+      {localTelemetryAgeMs}
+      {uiMessage}
+      {sendCommand}
+    />
   </section>
 </main>
