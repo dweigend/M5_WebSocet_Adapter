@@ -4,19 +4,20 @@
 
 import { ShieldAlert } from "lucide-svelte";
 import DeviceStatusPanel from "$lib/DeviceStatusPanel.svelte";
-import type { DeviceSnapshot } from "$lib/device-state";
+import type { CommandTransport, SourceAwareDeviceSnapshot } from "$lib/device-transport";
 import OrientationScene from "$lib/OrientationScene.svelte";
 import type { DeviceCommandType } from "$lib/protocol";
 
 interface Props {
-  devices: DeviceSnapshot[];
+  devices: SourceAwareDeviceSnapshot[];
   selectedDeviceId: string;
-  selectedDevice: DeviceSnapshot | undefined;
+  selectedDevice: SourceAwareDeviceSnapshot | undefined;
   localSafeMode: boolean;
   canSendCommand: boolean;
   lastMessageAgeMs: number | null;
   localTelemetryAgeMs: number | null;
   uiMessage: string;
+  commandTransport: CommandTransport | undefined;
   sendCommand: (commandType: DeviceCommandType) => Promise<void>;
 }
 
@@ -29,6 +30,7 @@ let {
   lastMessageAgeMs,
   localTelemetryAgeMs,
   uiMessage,
+  commandTransport,
   sendCommand,
 }: Props = $props();
 </script>
@@ -60,6 +62,7 @@ let {
       {lastMessageAgeMs}
       {localTelemetryAgeMs}
       {uiMessage}
+      {commandTransport}
       {sendCommand}
     />
   </div>

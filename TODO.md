@@ -10,6 +10,7 @@
 - [x] WP5: Three.js live test UI is implemented.
 - [x] WP6: End-to-end integration pass is complete.
 - [x] WP7: Verification and final documentation are complete.
+- [x] WP8: USB test mode treats Web Serial as a first-class telemetry transport.
 
 ## WP0: Coordination Files
 
@@ -260,6 +261,35 @@ Verification results from 2026-05-20 integration session:
 - `bun run verify:integration`: passed.
 - `pio run`: not run because `pio` was not available in `PATH`; documented in `README.md` and `firmware/README.md`.
 - `git status --short --branch`: expected clean after the final integration commit.
+
+## WP8: USB Test Mode
+
+Owner: integration session.
+
+Write scope:
+
+- Browser-side USB session orchestration.
+- Svelte test-mode panels.
+- Source-aware UI command routing.
+- Focused tests and short documentation updates.
+
+Goals:
+
+- Use USB as a live telemetry transport without SSID, password, or saved WebSocket config.
+- Keep raw serial lines, parsed frame counters, invalid-line diagnostics, and telemetry rate visible.
+- Feed valid USB frames into the same device state model and Three.js visualization as hub frames.
+- Route commands to USB for USB-sourced devices and use the hub only when USB is unavailable.
+- Keep firmware flashing out of the live telemetry workflow.
+
+Acceptance criteria:
+
+- [x] USB orchestration is extracted from `src/routes/+page.svelte`.
+- [x] Raw serial log keeps the last 500 lines.
+- [x] `register`, `heartbeat`, `imu`, `orientation`, `configureResult`, and unsupported lines have counters.
+- [x] Source is shown as `usb`, `hub`, or `both`.
+- [x] Commands prefer USB for USB-sourced devices and fall back to hub when USB is unavailable.
+- [x] Unit tests cover USB session parsing, ringbuffer behavior, frame counters, and command routing.
+- [ ] Hardware verification on a real M5StickC Plus2 remains open.
 
 ## Parallelization Rules
 

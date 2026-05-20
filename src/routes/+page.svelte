@@ -3,45 +3,40 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: Svelte template uses these bindings.
 
 import { Server } from "lucide-svelte";
+import { onMount } from "svelte";
 import { browser } from "$app/environment";
-import { DeviceRegistry, type DeviceSnapshot, SAFE_MODE_TIMEOUT_MS } from "$lib/device-state";
-import { type DeviceCommandType, parseDeviceMessage } from "$lib/protocol";
-import SetupPanel from "$lib/SetupPanel.svelte";
-import {
-  type ConfigureResult,
-  createConfigureRequest,
-  formatSerialTestResult,
-  isWebSerialSupported,
-  SerialSetupConnection,
-} from "$lib/serial-setup";
+import DeviceManagementPanel from "$lib/DeviceManagementPanel.svelte";
+import { type DeviceSnapshot, SAFE_MODE_TIMEOUT_MS } from "$lib/device-state";
+import { chooseCommandTransport, mergeSourceAwareDevices } from "$lib/device-transport";
+import type { DeviceCommandType } from "$lib/protocol";
+import RawSerialConsole from "$lib/RawSerialConsole.svelte";
+import { createConfigureRequest } from "$lib/serial-setup";
+import TelemetryOverviewPanel from "$lib/TelemetryOverviewPanel.svelte";
 import TelemetryPanel from "$lib/TelemetryPanel.svelte";
+import UsbTestModePanel from "$lib/UsbTestModePanel.svelte";
 import {
   createUiCommand,
   createUiWebSocketUrl,
   type UiServerMessage,
   UiTelemetrySocket,
 } from "$lib/ui-websocket";
+import { createInitialUsbState, UsbTestSession } from "$lib/usb-test-session";
 
 let ssid = $state("");
 let password = $state("");
 let serverUrl = $state("ws://localhost:8787/ws/device");
 let deviceId = $state("m5stick-plus2-001");
-let serialConnection: SerialSetupConnection | undefined;
-const serialDeviceRegistry = new DeviceRegistry();
-let serialSupported = $state(false);
-let serialConnected = $state(false);
-let serialBusy = $state(false);
-let serialMessage = $state("Web Serial is checked after the page loads.");
-let configureResult: ConfigureResult | undefined = $state();
-let serialLines = $state<string[]>([]);
+let usbSession: UsbTestSession | undefined;
+let usbState = $state(createInitialUsbState());
 
 let uiSocket: UiTelemetrySocket | undefined;
 let uiConnected = $state(false);
 let uiMessage = $state("Telemetry hub is disconnected.");
-let devices = $state<DeviceSnapshot[]>([]);
+let hubDevices = $state<DeviceSnapshot[]>([]);
 let selectedDeviceId = $state("");
 let currentTime = $state(Date.now());
 
+const devices = $derived(mergeSourceAwareDevices(hubDevices, usbState.devices));
 const selectedDevice = $derived(
   devices.find((device) => device.deviceId === selectedDeviceId) ?? devices[0],
 );
@@ -57,22 +52,31 @@ const localSafeMode = $derived(
     localTelemetryAgeMs === null ||
     localTelemetryAgeMs > SAFE_MODE_TIMEOUT_MS,
 );
-const canSendCommand = $derived(
-  Boolean((uiConnected || serialConnected) && selectedDevice?.connected),
+const commandTransport = $derived(
+  chooseCommandTransport({
+    device: selectedDevice,
+    usbAvailable: usbState.connected,
+    hubAvailable: uiConnected,
+  }),
 );
+const canSendCommand = $derived(Boolean(commandTransport && selectedDevice?.connected));
 const lastMessageAgeMs = $derived(
   selectedDevice ? Math.max(0, currentTime - selectedDevice.lastMessageAt) : null,
 );
+const lastUsbFrameAgeMs = $derived(
+  usbState.lastFrameAt === null ? null : Math.max(0, currentTime - usbState.lastFrameAt),
+);
 
-$effect(() => {
+onMount(() => {
   if (!browser) {
     return;
   }
 
-  serialSupported = isWebSerialSupported();
-  serialMessage = serialSupported
-    ? "Ready to connect a Stick over USB serial."
-    : "Web Serial is unavailable in this browser.";
+  usbSession = new UsbTestSession();
+  const unsubscribeUsbSession = usbSession.subscribe((nextState) => {
+    usbState = nextState;
+  });
+  usbSession.initialize();
 
   uiSocket = new UiTelemetrySocket(
     createUiWebSocketUrl(window.location, {
@@ -97,128 +101,33 @@ $effect(() => {
   uiSocket.connect();
 
   const clock = window.setInterval(() => {
-    currentTime = Date.now();
+    const now = Date.now();
+    currentTime = now;
+    usbSession?.refresh(now);
   }, 500);
 
   return () => {
     window.clearInterval(clock);
+    unsubscribeUsbSession();
     for (const unsubscribeListener of unsubscribe) {
       unsubscribeListener();
     }
     uiSocket?.disconnect();
-    void disconnectSerial();
+    void usbSession?.disconnect();
   };
 });
 
-async function connectSerial(): Promise<void> {
-  if (!serialSupported || serialBusy) {
-    return;
-  }
-
-  await runSerialAction(
-    async () => {
-      serialConnection = new SerialSetupConnection();
-      serialConnection.subscribe((event) => {
-        if (event.type === "configureResult") {
-          configureResult = event.result;
-          serialMessage = event.result.message;
-          return;
-        }
-
-        if (event.type === "line") {
-          const parsedDeviceMessage = parseDeviceMessage(event.line);
-          if (parsedDeviceMessage.ok) {
-            const update = serialDeviceRegistry.upsertFromMessage(
-              parsedDeviceMessage.message,
-              Date.now(),
-            );
-            upsertDevice(update.snapshot);
-            serialMessage = `USB telemetry received from ${update.snapshot.deviceId}.`;
-            return;
-          }
-
-          serialLines = [event.line, ...serialLines].slice(0, 4);
-          return;
-        }
-
-        serialMessage = event.message;
-      });
-      await serialConnection.connect();
-      serialConnected = true;
-      serialMessage = "Serial port connected.";
-    },
-    { fallbackMessage: "Could not connect serial port.", clearConnectionOnError: true },
-  );
-}
-
-async function runSerialAction(
-  action: () => Promise<void>,
-  options: { fallbackMessage: string; clearConnectionOnError?: boolean },
-): Promise<void> {
-  serialBusy = true;
-  configureResult = undefined;
-
-  try {
-    await action();
-  } catch (error) {
-    serialMessage = error instanceof Error ? error.message : options.fallbackMessage;
-    if (options.clearConnectionOnError) {
-      serialConnection = undefined;
-    }
-  } finally {
-    serialBusy = false;
-  }
-}
-
-async function testSerial(): Promise<void> {
-  if (!serialSupported || serialBusy || serialConnected) {
-    return;
-  }
-
-  await runSerialAction(
-    async () => {
-      const result = await SerialSetupConnection.testConnection();
-      serialMessage = formatSerialTestResult(result);
-    },
-    { fallbackMessage: "Could not test serial port." },
-  );
-}
-
-async function disconnectSerial(): Promise<void> {
-  serialBusy = true;
-
-  try {
-    await serialConnection?.disconnect();
-  } finally {
-    serialConnection = undefined;
-    serialConnected = false;
-    serialBusy = false;
-    serialMessage = serialSupported
-      ? "Serial port disconnected."
-      : "Web Serial is unavailable in this browser.";
-  }
-}
-
 async function submitConfigure(): Promise<void> {
-  if (!serialConnection || serialBusy) {
+  if (!usbSession || usbState.busy) {
     return;
   }
 
-  const connection = serialConnection;
-  await runSerialAction(
-    async () => {
-      await connection.sendConfigure(
-        createConfigureRequest({ ssid, password, serverUrl, deviceId }),
-      );
-      serialMessage = "Configure message sent. Waiting for device response.";
-    },
-    { fallbackMessage: "Could not send configuration." },
-  );
+  await usbSession.sendConfigure(createConfigureRequest({ ssid, password, serverUrl, deviceId }));
 }
 
 function handleUiMessage(message: UiServerMessage): void {
   if (message.type === "snapshot") {
-    devices = message.devices;
+    hubDevices = message.devices;
     selectedDeviceId = selectedDeviceId || message.devices[0]?.deviceId || "";
     return;
   }
@@ -232,12 +141,12 @@ function handleUiMessage(message: UiServerMessage): void {
 }
 
 function upsertDevice(nextDevice: DeviceSnapshot): void {
-  const existingIndex = devices.findIndex((device) => device.deviceId === nextDevice.deviceId);
+  const existingIndex = hubDevices.findIndex((device) => device.deviceId === nextDevice.deviceId);
 
   if (existingIndex === -1) {
-    devices = [...devices, nextDevice];
+    hubDevices = [...hubDevices, nextDevice];
   } else {
-    devices = devices.map((device) =>
+    hubDevices = hubDevices.map((device) =>
       device.deviceId === nextDevice.deviceId ? nextDevice : device,
     );
   }
@@ -251,21 +160,38 @@ async function sendCommand(commandType: DeviceCommandType): Promise<void> {
   }
 
   try {
-    if (uiConnected && uiSocket) {
+    if (commandTransport === "usb") {
+      await usbSession?.sendCommand(commandType);
+      return;
+    }
+
+    if (commandTransport === "hub" && uiSocket) {
       uiSocket.sendCommand(createUiCommand(commandType, selectedDevice.deviceId));
       uiMessage = `${commandType} sent to ${selectedDevice.deviceId}.`;
       return;
     }
 
-    if (serialConnected && serialConnection) {
-      await serialConnection.sendCommand(commandType);
-      serialMessage = `${commandType} sent over USB serial.`;
-    }
+    uiMessage = "No command transport is available.";
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not send command.";
     uiMessage = message;
-    serialMessage = message;
   }
+}
+
+async function connectUsb(): Promise<void> {
+  await usbSession?.connect();
+}
+
+async function disconnectUsb(): Promise<void> {
+  await usbSession?.disconnect();
+}
+
+async function testUsb(): Promise<void> {
+  await usbSession?.testConnection();
+}
+
+function clearRawLog(): void {
+  usbSession?.clearRawLog();
 }
 </script>
 
@@ -286,33 +212,46 @@ async function sendCommand(commandType: DeviceCommandType): Promise<void> {
   </header>
 
   <section class="dashboard-grid" aria-label="Adapter workspace">
-    <SetupPanel
-      bind:ssid
-      bind:password
-      bind:serverUrl
-      bind:deviceId
-      {serialSupported}
-      {serialConnected}
-      {serialBusy}
-      {serialMessage}
-      {configureResult}
-      {serialLines}
-      {testSerial}
-      {connectSerial}
-      {disconnectSerial}
-      {submitConfigure}
-    />
+    <div class="side-stack">
+      <UsbTestModePanel
+        {usbState}
+        lastFrameAgeMs={lastUsbFrameAgeMs}
+        {connectUsb}
+        {disconnectUsb}
+        {testUsb}
+      />
 
-    <TelemetryPanel
-      {devices}
-      bind:selectedDeviceId
-      {selectedDevice}
-      {localSafeMode}
-      {canSendCommand}
-      {lastMessageAgeMs}
-      {localTelemetryAgeMs}
-      {uiMessage}
-      {sendCommand}
-    />
+      <DeviceManagementPanel
+        bind:ssid
+        bind:password
+        bind:serverUrl
+        bind:deviceId
+        usbSupported={usbState.supported}
+        usbConnected={usbState.connected}
+        usbBusy={usbState.busy}
+        configureResult={usbState.configureResult}
+        usbMessage={usbState.message}
+        {submitConfigure}
+      />
+    </div>
+
+    <div class="main-stack">
+      <TelemetryPanel
+        {devices}
+        bind:selectedDeviceId
+        {selectedDevice}
+        {localSafeMode}
+        {canSendCommand}
+        {lastMessageAgeMs}
+        {localTelemetryAgeMs}
+        {uiMessage}
+        {commandTransport}
+        {sendCommand}
+      />
+
+      <TelemetryOverviewPanel {selectedDevice} telemetryRateHz={usbState.telemetryRateHz} />
+
+      <RawSerialConsole rawLines={usbState.rawLines} {clearRawLog} />
+    </div>
   </section>
 </main>

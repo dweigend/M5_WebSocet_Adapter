@@ -14,7 +14,7 @@ import {
   ShieldAlert,
   Wifi,
 } from "lucide-svelte";
-import type { DeviceSnapshot } from "$lib/device-state";
+import type { CommandTransport, SourceAwareDeviceSnapshot } from "$lib/device-transport";
 import type { DeviceCommandType } from "$lib/protocol";
 
 const COMMANDS: Array<{ type: DeviceCommandType; label: string; icon: typeof RotateCcw }> = [
@@ -26,13 +26,14 @@ const COMMANDS: Array<{ type: DeviceCommandType; label: string; icon: typeof Rot
 ];
 
 interface Props {
-  devices: DeviceSnapshot[];
+  devices: SourceAwareDeviceSnapshot[];
   selectedDeviceId: string;
-  selectedDevice: DeviceSnapshot | undefined;
+  selectedDevice: SourceAwareDeviceSnapshot | undefined;
   canSendCommand: boolean;
   lastMessageAgeMs: number | null;
   localTelemetryAgeMs: number | null;
   uiMessage: string;
+  commandTransport: CommandTransport | undefined;
   sendCommand: (commandType: DeviceCommandType) => Promise<void>;
 }
 
@@ -44,6 +45,7 @@ let {
   lastMessageAgeMs,
   localTelemetryAgeMs,
   uiMessage,
+  commandTransport,
   sendCommand,
 }: Props = $props();
 
@@ -77,7 +79,7 @@ function formatPercent(value: number | undefined): string {
         <option value="">No devices</option>
       {:else}
         {#each devices as device (device.deviceId)}
-          <option value={device.deviceId}>{device.deviceId}</option>
+          <option value={device.deviceId}>{device.deviceId} ({device.source})</option>
         {/each}
       {/if}
     </select>
@@ -86,8 +88,8 @@ function formatPercent(value: number | undefined): string {
   <div class="metric-grid">
     <article>
       <Activity size={18} aria-hidden="true" />
-      <span>Connected</span>
-      <strong>{selectedDevice?.connected ? "yes" : "no"}</strong>
+      <span>Source</span>
+      <strong>{selectedDevice?.source ?? "-"}</strong>
     </article>
     <article>
       <RotateCcw size={18} aria-hidden="true" />
@@ -128,6 +130,10 @@ function formatPercent(value: number | undefined): string {
     <div>
       <dt>Hub status</dt>
       <dd>{uiMessage}</dd>
+    </div>
+    <div>
+      <dt>Command route</dt>
+      <dd>{commandTransport ?? "unavailable"}</dd>
     </div>
   </dl>
 

@@ -48,6 +48,10 @@ The **Connect via USB** button uses Web Serial. The browser must ask for permiss
 but the chooser is filtered to likely M5/WCH serial devices and already-granted ports are reused
 automatically. With the project firmware installed, USB telemetry works without WiFi, SSID, or
 password; the device appears as `m5stick-plus2-usb` until a configured device ID is saved.
+The USB test mode keeps a raw serial console, parsed frame counters, invalid-line diagnostics, a
+telemetry-rate estimate, and feeds valid frames into the same live visualization used for hub data.
+Commands for USB-sourced devices are sent over USB first and fall back to the hub only when USB is
+not available.
 
 By default, the UI connects to `ws://<current-host>:8787/ws/ui`. Override the hub connection with
 `PUBLIC_M5_HUB_PORT=8788 bun run dev`, `PUBLIC_M5_HUB_URL=ws://127.0.0.1:8788/ws/ui bun run dev`,
@@ -88,22 +92,19 @@ telemetry happy path and command forwarding are covered in the regular test comm
 Build the M5StickC Plus2 firmware:
 
 ```sh
-cd firmware
-pio run
+bun run firmware:build
 ```
 
 Upload the firmware:
 
 ```sh
-cd firmware
-pio run --target upload
+bun run firmware:upload
 ```
 
 Open the serial monitor:
 
 ```sh
-cd firmware
-pio device monitor --baud 115200
+bun run firmware:monitor
 ```
 
 If `pio` is not installed, the firmware cannot be verified locally from this checkout. During the
