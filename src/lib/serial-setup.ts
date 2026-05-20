@@ -8,7 +8,7 @@ export const M5_SERIAL_PORT_FILTERS = [
 ];
 
 const WEB_SERIAL_CHOOSER_DIAGNOSTIC =
-  "If Chrome closes on macOS while opening the chooser, see USB_CONNECT_CRASH_REPORT.md for the Bluetooth/TCC chooser crash.";
+  "If Chrome closes on macOS while opening the chooser, close other serial tools, reconnect the device, and check docs/controller-setup.md.";
 
 export interface ConfigureRequest {
   type: "configure";
@@ -133,7 +133,7 @@ export function formatSerialTestResult(result: SerialTestResult): string {
   }. Writable: ${result.writable ? "yes" : "no"}.${usbInfo}`;
 }
 
-export function formatSerialPortRequestError(error: unknown): string {
+function formatSerialPortRequestError(error: unknown): string {
   if (
     typeof DOMException !== "undefined" &&
     error instanceof DOMException &&
@@ -201,7 +201,6 @@ export class SerialSetupConnection {
     }
   }
 
-  // fallow-ignore-next-line unused-class-member
   async sendConfigure(request: ConfigureRequest): Promise<void> {
     if (!this.#writer) {
       throw new Error("Serial port is not connected.");
@@ -326,7 +325,7 @@ export async function selectM5SerialPort(serial: SerialLike): Promise<SerialPort
   }
 }
 
-export function isLikelyM5SerialPort(port: SerialPortLike): boolean {
+function isLikelyM5SerialPort(port: SerialPortLike): boolean {
   const info = port.getInfo?.();
 
   if (!info?.usbVendorId) {

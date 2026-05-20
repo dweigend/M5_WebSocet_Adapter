@@ -69,8 +69,8 @@ Use the local probe when the browser is not enough:
 bun run serial:probe -- --port /dev/cu.usbserial-... --baud 115200 --seconds 8
 ```
 
-The historical investigation that established the CH9102 port, bootloader access, and post-flash
-JSON telemetry is recorded in `USB_SERIAL_DIAGNOSTIC_REPORT.md`.
+The local probe is useful when the browser cannot access Web Serial or when you want to confirm that
+the flashed firmware emits JSON frames independently of the UI.
 
 ## Troubleshooting
 
@@ -78,8 +78,8 @@ JSON telemetry is recorded in `USB_SERIAL_DIAGNOSTIC_REPORT.md`.
   and prefer a `cu.usbserial...` port on macOS.
 - **The port opens but no JSON frames arrive:** flash the project firmware first; factory firmware
   does not emit this repo's telemetry protocol.
-- **The browser crashes or closes while selecting a port:** see `USB_CONNECT_CRASH_REPORT.md` for
-  the historical macOS/Chrome chooser investigation.
+- **The browser crashes or closes while selecting a port:** close other serial/Bluetooth tools,
+  reconnect the device, reinstall the CH9102/CP34X driver, and retry in a current Chromium browser.
 - **The UI says the hub is offline:** start the hub with `bun run server`; USB diagnostics can still
   work while the hub is offline.
 - **Multiple serial devices are listed:** use the CH9102/WCH device, not unrelated USB CDC devices.

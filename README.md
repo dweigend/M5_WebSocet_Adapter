@@ -14,8 +14,7 @@ Start here if you are learning how the project works:
 
 - This README gives the quick start and the main runtime flow.
 - [docs/controller-setup.md](./docs/controller-setup.md) explains hardware setup and troubleshooting.
-- [PLAN.md](./PLAN.md) is the architecture and protocol reference.
-- [TODO.md](./TODO.md) and [SESSION_PROMPTS.md](./SESSION_PROMPTS.md) are maintainer notes.
+- [docs/protocol.md](./docs/protocol.md) explains the JSON messages used by the controller, hub, and UI.
 
 ## V1 Scope
 
@@ -155,10 +154,8 @@ The firmware mirrors `register`, `heartbeat`, `imu`, and `orientation` JSON fram
 well as WebSocket. This makes the first hardware check USB-first: flash the firmware, open the UI,
 click **Connect via USB**, and live IMU data should appear without configuring WiFi.
 
-## Coordination Rules
+## Project Rules
 
-- Keep server/protocol, firmware, and UI work in separate sessions when possible.
-- Do not edit another session's ownership area unless the integration session requires it.
 - Keep code, file names, commit messages, pull requests, and code comments in English.
-- Chat with the user in German.
-- Run the checks listed in [TODO.md](./TODO.md) before considering a package complete.
+- Prefer small, readable changes over clever abstractions.
+- Run `bun run lint`, `bun run check`, `bun run build`, `bun run test`, and `bun run firmware:build` before publishing changes.
