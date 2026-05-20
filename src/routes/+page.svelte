@@ -4,12 +4,13 @@
 
 import { Server } from "lucide-svelte";
 import { browser } from "$app/environment";
-import { type DeviceSnapshot, SAFE_MODE_TIMEOUT_MS } from "$lib/device-state";
-import type { DeviceCommandType } from "$lib/protocol";
+import { DeviceRegistry, type DeviceSnapshot, SAFE_MODE_TIMEOUT_MS } from "$lib/device-state";
+import { type DeviceCommandType, parseDeviceMessage } from "$lib/protocol";
 import SetupPanel from "$lib/SetupPanel.svelte";
 import {
   type ConfigureResult,
   createConfigureRequest,
+  formatSerialTestResult,
   isWebSerialSupported,
   SerialSetupConnection,
 } from "$lib/serial-setup";
@@ -26,6 +27,7 @@ let password = $state("");
 let serverUrl = $state("ws://localhost:8787/ws/device");
 let deviceId = $state("m5stick-plus2-001");
 let serialConnection: SerialSetupConnection | undefined;
+const serialDeviceRegistry = new DeviceRegistry();
 let serialSupported = $state(false);
 let serialConnected = $state(false);
 let serialBusy = $state(false);
@@ -55,7 +57,9 @@ const localSafeMode = $derived(
     localTelemetryAgeMs === null ||
     localTelemetryAgeMs > SAFE_MODE_TIMEOUT_MS,
 );
-const canSendCommand = $derived(Boolean(uiConnected && selectedDevice?.connected));
+const canSendCommand = $derived(
+  Boolean((uiConnected || serialConnected) && selectedDevice?.connected),
+);
 const lastMessageAgeMs = $derived(
   selectedDevice ? Math.max(0, currentTime - selectedDevice.lastMessageAt) : null,
 );
@@ -111,34 +115,73 @@ async function connectSerial(): Promise<void> {
     return;
   }
 
+  await runSerialAction(
+    async () => {
+      serialConnection = new SerialSetupConnection();
+      serialConnection.subscribe((event) => {
+        if (event.type === "configureResult") {
+          configureResult = event.result;
+          serialMessage = event.result.message;
+          return;
+        }
+
+        if (event.type === "line") {
+          const parsedDeviceMessage = parseDeviceMessage(event.line);
+          if (parsedDeviceMessage.ok) {
+            const update = serialDeviceRegistry.upsertFromMessage(
+              parsedDeviceMessage.message,
+              Date.now(),
+            );
+            upsertDevice(update.snapshot);
+            serialMessage = `USB telemetry received from ${update.snapshot.deviceId}.`;
+            return;
+          }
+
+          serialLines = [event.line, ...serialLines].slice(0, 4);
+          return;
+        }
+
+        serialMessage = event.message;
+      });
+      await serialConnection.connect();
+      serialConnected = true;
+      serialMessage = "Serial port connected.";
+    },
+    { fallbackMessage: "Could not connect serial port.", clearConnectionOnError: true },
+  );
+}
+
+async function runSerialAction(
+  action: () => Promise<void>,
+  options: { fallbackMessage: string; clearConnectionOnError?: boolean },
+): Promise<void> {
   serialBusy = true;
   configureResult = undefined;
 
   try {
-    serialConnection = new SerialSetupConnection();
-    serialConnection.subscribe((event) => {
-      if (event.type === "configureResult") {
-        configureResult = event.result;
-        serialMessage = event.result.message;
-        return;
-      }
-
-      if (event.type === "line") {
-        serialLines = [event.line, ...serialLines].slice(0, 4);
-        return;
-      }
-
-      serialMessage = event.message;
-    });
-    await serialConnection.connect();
-    serialConnected = true;
-    serialMessage = "Serial port connected.";
+    await action();
   } catch (error) {
-    serialMessage = error instanceof Error ? error.message : "Could not connect serial port.";
-    serialConnection = undefined;
+    serialMessage = error instanceof Error ? error.message : options.fallbackMessage;
+    if (options.clearConnectionOnError) {
+      serialConnection = undefined;
+    }
   } finally {
     serialBusy = false;
   }
+}
+
+async function testSerial(): Promise<void> {
+  if (!serialSupported || serialBusy || serialConnected) {
+    return;
+  }
+
+  await runSerialAction(
+    async () => {
+      const result = await SerialSetupConnection.testConnection();
+      serialMessage = formatSerialTestResult(result);
+    },
+    { fallbackMessage: "Could not test serial port." },
+  );
 }
 
 async function disconnectSerial(): Promise<void> {
@@ -161,19 +204,16 @@ async function submitConfigure(): Promise<void> {
     return;
   }
 
-  serialBusy = true;
-  configureResult = undefined;
-
-  try {
-    await serialConnection.sendConfigure(
-      createConfigureRequest({ ssid, password, serverUrl, deviceId }),
-    );
-    serialMessage = "Configure message sent. Waiting for device response.";
-  } catch (error) {
-    serialMessage = error instanceof Error ? error.message : "Could not send configuration.";
-  } finally {
-    serialBusy = false;
-  }
+  const connection = serialConnection;
+  await runSerialAction(
+    async () => {
+      await connection.sendConfigure(
+        createConfigureRequest({ ssid, password, serverUrl, deviceId }),
+      );
+      serialMessage = "Configure message sent. Waiting for device response.";
+    },
+    { fallbackMessage: "Could not send configuration." },
+  );
 }
 
 function handleUiMessage(message: UiServerMessage): void {
@@ -205,16 +245,26 @@ function upsertDevice(nextDevice: DeviceSnapshot): void {
   selectedDeviceId = selectedDeviceId || nextDevice.deviceId;
 }
 
-function sendCommand(commandType: DeviceCommandType): void {
-  if (!selectedDevice || !uiSocket) {
+async function sendCommand(commandType: DeviceCommandType): Promise<void> {
+  if (!selectedDevice) {
     return;
   }
 
   try {
-    uiSocket.sendCommand(createUiCommand(commandType, selectedDevice.deviceId));
-    uiMessage = `${commandType} sent to ${selectedDevice.deviceId}.`;
+    if (uiConnected && uiSocket) {
+      uiSocket.sendCommand(createUiCommand(commandType, selectedDevice.deviceId));
+      uiMessage = `${commandType} sent to ${selectedDevice.deviceId}.`;
+      return;
+    }
+
+    if (serialConnected && serialConnection) {
+      await serialConnection.sendCommand(commandType);
+      serialMessage = `${commandType} sent over USB serial.`;
+    }
   } catch (error) {
-    uiMessage = error instanceof Error ? error.message : "Could not send command.";
+    const message = error instanceof Error ? error.message : "Could not send command.";
+    uiMessage = message;
+    serialMessage = message;
   }
 }
 </script>
@@ -247,6 +297,7 @@ function sendCommand(commandType: DeviceCommandType): void {
       {serialMessage}
       {configureResult}
       {serialLines}
+      {testSerial}
       {connectSerial}
       {disconnectSerial}
       {submitConfigure}

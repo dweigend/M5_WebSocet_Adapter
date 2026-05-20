@@ -22,6 +22,9 @@ pio device monitor --baud 115200
 
 ## Serial Setup
 
+The firmware also streams `register`, `heartbeat`, `imu`, and `orientation` JSON frames over USB
+serial at 115200 baud. This allows a USB-only hardware smoke test before WiFi is configured.
+
 Send one newline-delimited JSON object over the serial monitor:
 
 ```json

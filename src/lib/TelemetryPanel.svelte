@@ -17,7 +17,7 @@ interface Props {
   lastMessageAgeMs: number | null;
   localTelemetryAgeMs: number | null;
   uiMessage: string;
-  sendCommand: (commandType: DeviceCommandType) => void;
+  sendCommand: (commandType: DeviceCommandType) => Promise<void>;
 }
 
 let {

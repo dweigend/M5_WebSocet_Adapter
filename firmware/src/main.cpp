@@ -13,6 +13,7 @@ namespace {
 constexpr const char *FirmwareVersion = "0.1.0";
 constexpr const char *DeviceRole = "controller";
 constexpr const char *PreferencesNamespace = "adapter";
+constexpr const char *UsbFallbackDeviceId = "m5stick-plus2-usb";
 
 constexpr uint32_t WifiReconnectIntervalMs = 3000;
 constexpr uint32_t WebSocketReconnectIntervalMs = 3000;
@@ -83,6 +84,10 @@ uint32_t nextSequence() {
 
 bool hasNetworkConfig() {
   return config.ssid.length() > 0 && config.serverUrl.length() > 0 && config.deviceId.length() > 0;
+}
+
+const char *effectiveDeviceId() {
+  return config.deviceId.length() > 0 ? config.deviceId.c_str() : UsbFallbackDeviceId;
 }
 
 void sendConfigureResult(bool ok, const char *message) {
@@ -170,19 +175,21 @@ void drawStatus() {
 
 template <typename TDocument>
 bool sendJsonDocument(TDocument &document) {
-  if (!webSocketConnected) {
-    return false;
-  }
-
   String payload;
   serializeJson(document, payload);
+  Serial.println(payload);
+
+  if (!webSocketConnected) {
+    return true;
+  }
+
   return webSocket.sendTXT(payload);
 }
 
 template <typename TDocument>
 void addBaseFrame(TDocument &document, const char *type) {
   document["type"] = type;
-  document["deviceId"] = config.deviceId;
+  document["deviceId"] = effectiveDeviceId();
   document["role"] = DeviceRole;
   document["seq"] = nextSequence();
   document["timeMs"] = millis();
@@ -261,6 +268,12 @@ void handleCommand(const uint8_t *payload, size_t length) {
   } else if (strcmp(type, "reboot") == 0) {
     ESP.restart();
   }
+}
+
+bool isDeviceCommandType(const char *type) {
+  return strcmp(type, "calibrate") == 0 || strcmp(type, "pause") == 0 ||
+         strcmp(type, "resume") == 0 || strcmp(type, "identify") == 0 ||
+         strcmp(type, "reboot") == 0;
 }
 
 void handleWebSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
@@ -361,6 +374,13 @@ void readSerialSetup() {
       }
 
       const char *type = document["type"] | "";
+      if (isDeviceCommandType(type)) {
+        String payload;
+        serializeJson(document, payload);
+        handleCommand(reinterpret_cast<const uint8_t *>(payload.c_str()), payload.length());
+        continue;
+      }
+
       if (strcmp(type, "configure") != 0) {
         sendConfigureResult(false, "Unsupported setup message");
         continue;
@@ -419,10 +439,6 @@ bool readImuSample(ImuSample &sample) {
 }
 
 void sendTelemetry(uint32_t nowMs) {
-  if (!webSocketConnected) {
-    return;
-  }
-
   if (nowMs - lastHeartbeatMs >= HeartbeatIntervalMs) {
     lastHeartbeatMs = nowMs;
     sendHeartbeatFrame();
@@ -461,6 +477,7 @@ void setup() {
   webSocket.onEvent(handleWebSocketEvent);
   drawStatus();
   sendConfigureResult(hasConfig, hasConfig ? "Configuration loaded" : "No saved configuration");
+  sendRegisterFrame();
 }
 
 void loop() {

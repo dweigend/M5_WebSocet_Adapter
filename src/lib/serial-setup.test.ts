@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createConfigureRequest,
+  formatSerialTestResult,
   parseConfigureResult,
   serializeConfigureRequest,
 } from "./serial-setup";
@@ -37,5 +38,17 @@ describe("serial setup", () => {
 
   it("ignores unrelated serial lines", () => {
     expect(parseConfigureResult("ready")).toBeUndefined();
+  });
+
+  it("formats USB serial test results", () => {
+    expect(
+      formatSerialTestResult({
+        baudRate: 115_200,
+        readable: true,
+        writable: true,
+        usbVendorId: 0x1a86,
+        usbProductId: 0x55d4,
+      }),
+    ).toBe("USB serial opened at 115200 baud. Readable: yes. Writable: yes. USB 1a86:55d4.");
   });
 });

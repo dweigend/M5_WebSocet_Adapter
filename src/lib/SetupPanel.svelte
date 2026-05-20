@@ -2,7 +2,7 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Svelte template uses component imports.
 // biome-ignore-all lint/correctness/noUnusedVariables: Svelte template uses these bindings.
 
-import { Cable, Send, Unplug } from "lucide-svelte";
+import { Cable, ScanLine, Send, Unplug } from "lucide-svelte";
 import type { ConfigureResult } from "$lib/serial-setup";
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   serialMessage: string;
   configureResult: ConfigureResult | undefined;
   serialLines: string[];
+  testSerial: () => Promise<void>;
   connectSerial: () => Promise<void>;
   disconnectSerial: () => Promise<void>;
   submitConfigure: () => Promise<void>;
@@ -32,6 +33,7 @@ let {
   serialMessage,
   configureResult,
   serialLines,
+  testSerial,
   connectSerial,
   disconnectSerial,
   submitConfigure,
@@ -59,11 +61,21 @@ const canSubmitConfigure = $derived(
       type="button"
       class="icon-button"
       disabled={!serialSupported || serialBusy || serialConnected}
+      onclick={testSerial}
+      title="Test USB serial port"
+    >
+      <ScanLine size={18} aria-hidden="true" />
+      <span>Test USB</span>
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      disabled={!serialSupported || serialBusy || serialConnected}
       onclick={connectSerial}
-      title="Connect serial port"
+      title="Connect via USB serial"
     >
       <Cable size={18} aria-hidden="true" />
-      <span>Connect</span>
+      <span>Connect via USB</span>
     </button>
     <button
       type="button"

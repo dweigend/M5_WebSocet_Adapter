@@ -38,6 +38,17 @@ Run the SvelteKit UI:
 bun run dev
 ```
 
+Open the UI and connect the Stick over USB:
+
+```text
+http://localhost:5173/
+```
+
+The **Connect via USB** button uses Web Serial. The browser must ask for permission at least once,
+but the chooser is filtered to likely M5/WCH serial devices and already-granted ports are reused
+automatically. With the project firmware installed, USB telemetry works without WiFi, SSID, or
+password; the device appears as `m5stick-plus2-usb` until a configured device ID is saved.
+
 By default, the UI connects to `ws://<current-host>:8787/ws/ui`. Override the hub connection with
 `PUBLIC_M5_HUB_PORT=8788 bun run dev`, `PUBLIC_M5_HUB_URL=ws://127.0.0.1:8788/ws/ui bun run dev`,
 or a browser URL such as `http://localhost:5173/?hubPort=8788`.
@@ -97,6 +108,10 @@ pio device monitor --baud 115200
 
 If `pio` is not installed, the firmware cannot be verified locally from this checkout. During the
 2026-05-20 integration session, PlatformIO was not available in `PATH`, so `pio run` was not run.
+
+The firmware mirrors `register`, `heartbeat`, `imu`, and `orientation` JSON frames to USB serial as
+well as WebSocket. This makes the first hardware check USB-first: flash the firmware, open the UI,
+click **Connect via USB**, and live IMU data should appear without configuring WiFi.
 
 ## Coordination Rules
 

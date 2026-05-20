@@ -1,8 +1,9 @@
 import { type RunningHub, startHub } from "../src/server/hub";
 
 const TEST_TIMEOUT_MS = 2_000;
+const TEST_PORT = 18_787;
 
-const hub = startHub({ port: 0, hostname: "127.0.0.1" });
+const hub = startHub({ port: TEST_PORT, hostname: "127.0.0.1" });
 
 try {
   const uiSocket = await openSocket(getHubWebSocketUrl(hub, "/ws/ui"));

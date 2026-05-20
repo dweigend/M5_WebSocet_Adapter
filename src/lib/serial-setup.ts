@@ -1,3 +1,12 @@
+import type { DeviceCommandType } from "./protocol";
+
+const M5_SERIAL_FILTERS = [
+  { usbVendorId: 0x1a86, usbProductId: 0x55d4 },
+  { usbVendorId: 0x1a86, usbProductId: 0x7523 },
+  { usbVendorId: 0x1a86 },
+  { usbVendorId: 0x10c4 },
+];
+
 export interface ConfigureRequest {
   type: "configure";
   ssid: string;
@@ -12,15 +21,42 @@ export interface ConfigureResult {
   message: string;
 }
 
-export type SerialSetupEvent =
+export interface SerialTestResult {
+  baudRate: number;
+  readable: boolean;
+  writable: boolean;
+  usbVendorId?: number;
+  usbProductId?: number;
+  signals?: SerialPortSignalsLike;
+}
+
+type SerialSetupEvent =
   | { type: "configureResult"; result: ConfigureResult }
   | { type: "line"; line: string }
   | { type: "error"; message: string };
 
 type SerialEventListener = (event: SerialSetupEvent) => void;
 
+interface SerialPortInfoLike {
+  usbVendorId?: number;
+  usbProductId?: number;
+}
+
+interface SerialPortSignalsLike {
+  clearToSend?: boolean;
+  dataCarrierDetect?: boolean;
+  dataSetReady?: boolean;
+  ringIndicator?: boolean;
+}
+
 interface SerialLike {
-  requestPort: () => Promise<SerialPortLike>;
+  getPorts: () => Promise<SerialPortLike[]>;
+  requestPort: (options?: { filters?: SerialPortFilterLike[] }) => Promise<SerialPortLike>;
+}
+
+interface SerialPortFilterLike {
+  usbVendorId: number;
+  usbProductId?: number;
 }
 
 interface SerialPortLike {
@@ -28,9 +64,11 @@ interface SerialPortLike {
   writable: WritableStream<Uint8Array> | null;
   open: (options: { baudRate: number }) => Promise<void>;
   close: () => Promise<void>;
+  getInfo?: () => SerialPortInfoLike;
+  getSignals?: () => Promise<SerialPortSignalsLike>;
 }
 
-export const DEFAULT_SERIAL_BAUD_RATE = 115_200;
+const DEFAULT_SERIAL_BAUD_RATE = 115_200;
 
 export function isWebSerialSupported(): boolean {
   return typeof navigator !== "undefined" && "serial" in navigator;
@@ -77,6 +115,17 @@ export function parseConfigureResult(line: string): ConfigureResult | undefined 
   }
 }
 
+export function formatSerialTestResult(result: SerialTestResult): string {
+  const usbInfo =
+    result.usbVendorId !== undefined && result.usbProductId !== undefined
+      ? ` USB ${result.usbVendorId.toString(16)}:${result.usbProductId.toString(16)}.`
+      : "";
+
+  return `USB serial opened at ${result.baudRate} baud. Readable: ${
+    result.readable ? "yes" : "no"
+  }. Writable: ${result.writable ? "yes" : "no"}.${usbInfo}`;
+}
+
 export class SerialSetupConnection {
   readonly #baudRate: number;
   readonly #listeners = new Set<SerialEventListener>();
@@ -89,10 +138,6 @@ export class SerialSetupConnection {
     this.#baudRate = baudRate;
   }
 
-  get connected(): boolean {
-    return Boolean(this.#port);
-  }
-
   subscribe(listener: SerialEventListener): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
@@ -103,8 +148,7 @@ export class SerialSetupConnection {
       return;
     }
 
-    const serial = getSerialApi();
-    const port = await serial.requestPort();
+    const port = await findM5SerialPort();
     await port.open({ baudRate: this.#baudRate });
 
     if (!port.readable || !port.writable) {
@@ -119,12 +163,39 @@ export class SerialSetupConnection {
     void this.#readLines(this.#readLoopAbort.signal);
   }
 
+  static async testConnection(baudRate = DEFAULT_SERIAL_BAUD_RATE): Promise<SerialTestResult> {
+    const port = await findM5SerialPort();
+
+    try {
+      await port.open({ baudRate });
+
+      return {
+        baudRate,
+        readable: Boolean(port.readable),
+        writable: Boolean(port.writable),
+        ...port.getInfo?.(),
+        signals: await port.getSignals?.(),
+      };
+    } finally {
+      await port.close();
+    }
+  }
+
+  // fallow-ignore-next-line unused-class-member
   async sendConfigure(request: ConfigureRequest): Promise<void> {
     if (!this.#writer) {
       throw new Error("Serial port is not connected.");
     }
 
     await this.#writer.write(new TextEncoder().encode(serializeConfigureRequest(request)));
+  }
+
+  async sendCommand(type: DeviceCommandType): Promise<void> {
+    if (!this.#writer) {
+      throw new Error("Serial port is not connected.");
+    }
+
+    await this.#writer.write(new TextEncoder().encode(`${JSON.stringify({ type })}\n`));
   }
 
   async disconnect(): Promise<void> {
@@ -213,6 +284,34 @@ export class SerialSetupConnection {
       listener(event);
     }
   }
+}
+
+async function findM5SerialPort(): Promise<SerialPortLike> {
+  const serial = getSerialApi();
+  const grantedPorts = await serial.getPorts();
+  const matchingGrantedPort = grantedPorts.find(isLikelyM5SerialPort);
+
+  if (matchingGrantedPort) {
+    return matchingGrantedPort;
+  }
+
+  return serial.requestPort({ filters: M5_SERIAL_FILTERS });
+}
+
+function isLikelyM5SerialPort(port: SerialPortLike): boolean {
+  const info = port.getInfo?.();
+
+  if (!info?.usbVendorId) {
+    return false;
+  }
+
+  return M5_SERIAL_FILTERS.some((filter) => {
+    if (filter.usbVendorId !== info.usbVendorId) {
+      return false;
+    }
+
+    return filter.usbProductId === undefined || filter.usbProductId === info.usbProductId;
+  });
 }
 
 function getSerialApi(): SerialLike {
