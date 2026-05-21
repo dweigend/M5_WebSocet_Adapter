@@ -54,7 +54,19 @@ try {
   );
 
   await replacementUpdate;
-  deviceSocket.close();
+  deviceSocket.send(
+    JSON.stringify({
+      type: "orientation",
+      deviceId: "m5stick-plus2-sim",
+      role: "controller",
+      seq: 3,
+      timeMs: 60,
+      pitch: 9.9,
+      roll: 9.9,
+      yaw: 9.9,
+      quality: 1,
+    }),
+  );
 
   const replacementCommand = waitForMessage(
     replacementDeviceSocket,

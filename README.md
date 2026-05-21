@@ -1,6 +1,13 @@
 # M5StickC Plus2 WebSocket Adapter
 
-This project coordinates a local WebSocket adapter for a M5Stack StickC Plus2.
+Small prototype for using a M5StickC Plus2 as a wireless controller in a web app.
+
+This repo is part of the early controller experiments for the
+[ICAROS project](https://github.com/dweigend/neural-flight-template). The goal is simple: connect
+the controller over WiFi and integrate its live IMU/orientation data into a web app through
+WebSocket. It is still a first test, but the core loop already works pretty well: flash the device,
+save the local WiFi and WebSocket settings once over USB, then let the Stick stream telemetry
+headlessly.
 
 The adapter has three parts:
 
@@ -16,15 +23,34 @@ Start here if you are learning how the project works:
 - [docs/controller-setup.md](./docs/controller-setup.md) explains hardware setup and troubleshooting.
 - [docs/protocol.md](./docs/protocol.md) explains the JSON messages used by the controller, hub, and UI.
 
+## Repository Layout
+
+- `src/lib/` contains browser-side protocol, transport, USB serial, and UI modules.
+- `src/server/` contains the local Bun WebSocket hub.
+- `src/routes/` contains the SvelteKit page shell that composes the diagnostics UI.
+- `firmware/` contains the PlatformIO firmware for the M5StickC Plus2.
+- `scripts/` contains local diagnostics and integration harnesses.
+- `docs/` contains hardware setup notes and the runtime protocol reference.
+
 ## V1 Scope
 
 - Local development only.
 - No cloud service.
 - No authentication.
-- No VR or Neural Flight integration yet.
+- No direct ICAROS/WebXR integration yet.
 - Web Serial is the setup mechanism for WiFi, WebSocket URL, and device ID.
 - Headless WiFi/WebSocket operation is the primary runtime mode.
 - USB serial remains the setup, recovery, and diagnostics path.
+
+## Design Notes
+
+- The hub is intentionally local and small: it validates device frames, tracks device state, and
+  forwards commands without owning hardware setup.
+- USB serial and WebSocket telemetry share the same JSON message shapes so the UI can diagnose a
+  flashed device before WiFi is configured.
+- Firmware tooling is pinned through the repo `.venv` to keep PlatformIO, esptool, and CI aligned.
+- Generated diagnostics, virtual environments, PlatformIO build output, and frontend build output are
+  ignored so the Git history stays focused on source, docs, and reproducible configuration.
 
 ## Local Setup
 
@@ -55,6 +81,9 @@ Run the Bun WebSocket hub in a second terminal:
 ```sh
 bun run server
 ```
+
+The hub binds to `127.0.0.1` by default. Set `HOST=0.0.0.0 bun run server` only when another device
+on the local network must connect directly to this machine.
 
 Open the UI:
 
@@ -159,3 +188,14 @@ click **Connect via USB**, and live IMU data should appear without configuring W
 - Keep code, file names, commit messages, pull requests, and code comments in English.
 - Prefer small, readable changes over clever abstractions.
 - Run `bun run lint`, `bun run check`, `bun run build`, `bun run test`, and `bun run firmware:build` before publishing changes.
+
+## Publishing Checklist
+
+- MIT license is included.
+- Confirm no real WiFi credentials, device secrets, or local probe logs are staged.
+- Run all verification commands from the project rules.
+- Confirm GitHub Actions passes on `main` after pushing.
+
+## License
+
+MIT

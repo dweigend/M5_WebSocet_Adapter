@@ -36,7 +36,7 @@ constexpr uint32_t WebSocketPongTimeoutMs = 1000;
 constexpr uint8_t WebSocketMissedPongLimit = 2;
 constexpr uint32_t HeartbeatIntervalMs = 2000;
 constexpr uint32_t ImuIntervalMs = 20;
-constexpr uint32_t DisplayIntervalMs = 500;
+constexpr uint32_t DisplayIntervalMs = 250;
 constexpr uint32_t IdentifyDurationMs = 3000;
 constexpr uint32_t SerialBufferLimit = 512;
 constexpr uint16_t DefaultWebSocketPort = 80;
@@ -85,6 +85,7 @@ Preferences preferences;
 WebSocketsClient webSocket;
 DeviceConfig config;
 ImuSample lastSample;
+M5Canvas displayCanvas(&M5.Display);
 
 String serialLine;
 String latestStatusMessage = "Booting";
@@ -102,6 +103,7 @@ bool webSocketConfigured = false;
 bool webSocketConnected = false;
 bool streamingEnabled = true;
 bool calibrated = false;
+bool displayCanvasReady = false;
 
 void setStatus(const char *message) {
   latestStatusMessage = message;
@@ -163,6 +165,50 @@ int rssiBarsFromDbm(int rssi) {
   }
 
   return 1 + (((rssi - RssiWeakDbm) * 3) / (RssiStrongDbm - RssiWeakDbm));
+}
+
+const char *displayModeLabel(bool wifiConnected, bool identifying) {
+  if (identifying) {
+    return "ID";
+  }
+
+  if (!hasConfig) {
+    return "SETUP";
+  }
+
+  if (!wifiConnected) {
+    return "WIFI";
+  }
+
+  if (!webSocketConnected) {
+    return "LINK";
+  }
+
+  return streamingEnabled ? "LIVE" : "PAUSED";
+}
+
+uint16_t displayModeColor(bool wifiConnected, bool identifying) {
+  if (identifying) {
+    return TFT_ORANGE;
+  }
+
+  if (!hasConfig || !wifiConnected || !webSocketConnected) {
+    return TFT_RED;
+  }
+
+  return streamingEnabled ? TFT_GREEN : TFT_YELLOW;
+}
+
+bool ensureDisplayCanvas(int width, int height) {
+  if (displayCanvasReady && displayCanvas.width() == width && displayCanvas.height() == height) {
+    return true;
+  }
+
+  displayCanvas.deleteSprite();
+  displayCanvas.setColorDepth(16);
+  displayCanvasReady = displayCanvas.createSprite(width, height) != nullptr;
+  displayCanvas.setTextWrap(false);
+  return displayCanvasReady;
 }
 
 bool isPositivePort(const String &value, uint16_t &port) {
@@ -350,15 +396,15 @@ void sendOrientationFrame(const ImuSample &sample) {
 
 void drawSignalBars(int x, int y, int activeBars, uint16_t activeColor, uint16_t inactiveColor) {
   constexpr int BarCount = 4;
-  constexpr int BarWidth = 4;
-  constexpr int BarGap = 2;
-  constexpr int BarStepHeight = 4;
+  constexpr int BarWidth = 7;
+  constexpr int BarGap = 3;
+  constexpr int BarStepHeight = 5;
 
   for (int index = 0; index < BarCount; index += 1) {
     const int barHeight = (index + 1) * BarStepHeight;
     const int barX = x + (index * (BarWidth + BarGap));
     const int barY = y + ((BarCount * BarStepHeight) - barHeight);
-    M5.Display.fillRect(barX, barY, BarWidth, barHeight, index < activeBars ? activeColor : inactiveColor);
+    displayCanvas.fillRect(barX, barY, BarWidth, barHeight, index < activeBars ? activeColor : inactiveColor);
   }
 }
 
@@ -372,109 +418,154 @@ void drawBatteryBar(
     uint16_t frameColor,
     uint16_t backgroundColor) {
   constexpr int TerminalWidth = 3;
-  M5.Display.drawRect(x, y, width, height, frameColor);
-  M5.Display.fillRect(x + width, y + 3, TerminalWidth, height - 6, frameColor);
+  displayCanvas.drawRect(x, y, width, height, frameColor);
+  displayCanvas.fillRect(x + width, y + 3, TerminalWidth, height - 6, frameColor);
 
   const int fillWidth = ((width - 4) * clampInt(percent, 0, 100)) / 100;
-  M5.Display.fillRect(x + 2, y + 2, width - 4, height - 4, backgroundColor);
-  M5.Display.fillRect(x + 2, y + 2, fillWidth, height - 4, fillColor);
+  displayCanvas.fillRect(x + 2, y + 2, width - 4, height - 4, backgroundColor);
+  displayCanvas.fillRect(x + 2, y + 2, fillWidth, height - 4, fillColor);
 }
 
-void drawWebSocketNode(int x, int y, bool connected, uint32_t phase, uint16_t accentColor) {
-  const uint16_t inactiveColor = connected ? TFT_DARKGREY : TFT_RED;
-  const uint16_t linkColor = connected ? accentColor : inactiveColor;
-  const int pulseRadius = connected ? 8 + static_cast<int>(phase % 3U) : 8;
+void drawLargeStatusBadge(
+    int x,
+    int y,
+    int width,
+    int height,
+    const char *label,
+    uint16_t fillColor,
+    uint16_t textColor) {
+  displayCanvas.fillRoundRect(x, y, width, height, 8, fillColor);
+  displayCanvas.setTextSize(3);
+  displayCanvas.setTextColor(textColor, fillColor);
+  const int textX = x + 10;
+  const int textY = y + ((height - 24) / 2);
+  displayCanvas.setCursor(textX, textY);
+  displayCanvas.printf("%s", label);
+}
 
-  M5.Display.drawCircle(x + 8, y + 8, pulseRadius, inactiveColor);
-  M5.Display.fillCircle(x + 8, y + 8, 4, linkColor);
-  M5.Display.fillCircle(x + 27, y + 8, 4, linkColor);
+void drawLinkIndicator(
+    int x,
+    int y,
+    int width,
+    bool wifiConnected,
+    bool connected,
+    uint16_t activeColor,
+    uint16_t mutedColor,
+    uint16_t backgroundColor) {
+  const int centerY = y + 10;
+  const int wifiX = x + 10;
+  const int serverX = x + width - 10;
+  const uint16_t wifiColor = wifiConnected ? activeColor : mutedColor;
+  const uint16_t linkColor = connected ? activeColor : mutedColor;
+
+  displayCanvas.drawFastHLine(wifiX + 9, centerY, serverX - wifiX - 18, mutedColor);
   if (connected) {
-    M5.Display.drawLine(x + 12, y + 8, x + 23, y + 8, linkColor);
-  } else {
-    M5.Display.drawLine(x + 12, y + 11, x + 17, y + 5, linkColor);
-    M5.Display.drawLine(x + 19, y + 11, x + 24, y + 5, linkColor);
+    displayCanvas.drawFastHLine(wifiX + 9, centerY, serverX - wifiX - 18, activeColor);
   }
+
+  displayCanvas.fillCircle(wifiX, centerY, 7, wifiColor);
+  displayCanvas.fillCircle(serverX, centerY, 7, linkColor);
+  displayCanvas.setTextSize(1);
+  displayCanvas.setTextColor(wifiColor, backgroundColor);
+  displayCanvas.setCursor(x, y + 24);
+  displayCanvas.print("WiFi");
+  displayCanvas.setTextColor(linkColor, backgroundColor);
+  displayCanvas.setCursor(x + width - 14, y + 24);
+  displayCanvas.print("WS");
 }
 
-void drawHorizon(int x, int y, int width, int height, const ImuSample &sample, uint32_t phase, uint16_t accentColor) {
+void drawHorizon(int x, int y, int width, int height, const ImuSample &sample, uint32_t nowMs, uint16_t accentColor) {
   const int centerX = x + (width / 2);
   const int centerY = y + (height / 2);
   const int radius = (width < height ? width : height) / 2 - 4;
   const float rollRadians = sample.roll * PI / 180.0F;
-  const float pitchOffset = clampFloat(sample.pitch, -35.0F, 35.0F) * static_cast<float>(radius) / 45.0F;
+  const float pitchOffset = clampFloat(sample.pitch, -35.0F, 35.0F) * static_cast<float>(radius) / 55.0F;
   const int lineDx = static_cast<int>(cosf(rollRadians) * static_cast<float>(radius));
   const int lineDy = static_cast<int>(sinf(rollRadians) * static_cast<float>(radius));
   const int horizonY = centerY + static_cast<int>(pitchOffset);
-  const float orbitRadians = (sample.yaw + static_cast<float>((phase % 12U) * 30U)) * PI / 180.0F;
-  const int orbitX = centerX + static_cast<int>(cosf(orbitRadians) * static_cast<float>(radius - 7));
-  const int orbitY = centerY + static_cast<int>(sinf(orbitRadians) * static_cast<float>(radius - 7));
+  const float orbitRadians = (sample.yaw + static_cast<float>(nowMs % 6000U) * 0.012F) * PI / 180.0F;
+  const int orbitX = centerX + static_cast<int>(cosf(orbitRadians) * static_cast<float>(radius - 10));
+  const int orbitY = centerY + static_cast<int>(sinf(orbitRadians) * static_cast<float>(radius - 10));
 
-  M5.Display.drawCircle(centerX, centerY, radius, TFT_DARKGREY);
-  M5.Display.drawCircle(centerX, centerY, radius - 8, TFT_DARKGREY);
-  M5.Display.drawLine(centerX - lineDx, horizonY - lineDy, centerX + lineDx, horizonY + lineDy, accentColor);
-  M5.Display.drawLine(centerX - 8, centerY, centerX + 8, centerY, TFT_WHITE);
-  M5.Display.drawLine(centerX, centerY - 8, centerX, centerY + 8, TFT_WHITE);
-  M5.Display.fillCircle(centerX, centerY, 2, TFT_WHITE);
-  M5.Display.fillCircle(orbitX, orbitY, 3, TFT_YELLOW);
+  displayCanvas.drawCircle(centerX, centerY, radius, TFT_DARKGREY);
+  displayCanvas.drawCircle(centerX, centerY, radius - 16, TFT_DARKGREY);
+  displayCanvas.drawLine(centerX - lineDx, horizonY - lineDy, centerX + lineDx, horizonY + lineDy, accentColor);
+  displayCanvas.drawLine(centerX - 18, centerY, centerX + 18, centerY, TFT_WHITE);
+  displayCanvas.drawLine(centerX, centerY - 18, centerX, centerY + 18, TFT_WHITE);
+  displayCanvas.fillCircle(centerX, centerY, 4, TFT_WHITE);
+  displayCanvas.fillCircle(orbitX, orbitY, 5, TFT_YELLOW);
 }
 
-void drawTelemetryPulse(int x, int y, int width, uint32_t phase, uint16_t accentColor) {
-  const int pulseX = x + static_cast<int>((phase * 11U) % static_cast<uint32_t>(width));
-  M5.Display.drawFastHLine(x, y, width, TFT_DARKGREY);
-  M5.Display.fillCircle(pulseX, y, 3, accentColor);
-  M5.Display.drawLine(pulseX - 6, y, pulseX - 2, y - 4, accentColor);
-  M5.Display.drawLine(pulseX + 2, y - 4, pulseX + 6, y, accentColor);
+void drawTelemetryPulse(int x, int y, int width, uint32_t nowMs, uint16_t accentColor) {
+  constexpr uint32_t CycleMs = 2400;
+  const int pulseX = x + static_cast<int>(((nowMs % CycleMs) * static_cast<uint32_t>(width)) / CycleMs);
+  displayCanvas.drawFastHLine(x, y, width, TFT_DARKGREY);
+  displayCanvas.fillCircle(pulseX, y, 4, accentColor);
 }
 
 void drawStatus() {
   const bool wifiConnected = WiFi.status() == WL_CONNECTED;
-  const bool identifying = millis() < identifyUntilMs;
+  const uint32_t nowMs = millis();
+  const bool identifying = nowMs < identifyUntilMs;
   const String ipAddress = wifiConnected ? WiFi.localIP().toString() : "-";
   const int batteryMillivolts = M5.Power.getBatteryVoltage();
   const int batteryPercent = batteryPercentFromMillivolts(batteryMillivolts);
   const int rssi = wifiConnected ? WiFi.RSSI() : RssiWeakDbm;
   const int width = M5.Display.width();
   const int height = M5.Display.height();
-  const uint32_t phase = millis() / DisplayIntervalMs;
   const uint16_t backgroundColor = identifying ? TFT_ORANGE : TFT_BLACK;
-  const uint16_t accentColor = identifying ? TFT_BLACK : TFT_CYAN;
-  const uint16_t okColor = identifying ? TFT_BLACK : TFT_GREEN;
+  const uint16_t accentColor = identifying ? TFT_BLACK : displayModeColor(wifiConnected, identifying);
+  const uint16_t badgeColor = displayModeColor(wifiConnected, identifying);
   const uint16_t mutedColor = identifying ? TFT_DARKGREY : TFT_DARKGREY;
   const uint16_t textColor = identifying ? TFT_BLACK : TFT_WHITE;
-  const uint16_t batteryColor = batteryPercent > 20 ? okColor : TFT_RED;
+  const uint16_t batteryColor = batteryPercent > 20 ? accentColor : TFT_RED;
   const int margin = 6;
-  const int headerBottom = 52;
+  const int badgeHeight = 42;
+  const int linkY = 58;
   const int footerY = height - 42;
-  const int availableHorizonHeight = footerY - headerBottom - 4;
-  const int horizonLimit = width - 22 < availableHorizonHeight ? width - 22 : availableHorizonHeight;
-  const int horizonSize = clampInt(horizonLimit, 42, 96);
+  const int horizonY = 92;
+  const int availableHorizonHeight = footerY - horizonY - 6;
+  const int horizonLimit = width - (margin * 2) < availableHorizonHeight ? width - (margin * 2) : availableHorizonHeight;
+  const int horizonSize = clampInt(horizonLimit, 78, 118);
   const int horizonX = (width - horizonSize) / 2;
-  const int horizonY = headerBottom + ((availableHorizonHeight - horizonSize) / 2);
+  char batteryText[8];
+  snprintf(batteryText, sizeof(batteryText), "%d%%", batteryPercent);
+
+  if (!ensureDisplayCanvas(width, height)) {
+    return;
+  }
+
+  displayCanvas.fillScreen(backgroundColor);
+  drawLargeStatusBadge(
+      margin,
+      8,
+      width - (margin * 2),
+      badgeHeight,
+      displayModeLabel(wifiConnected, identifying),
+      badgeColor,
+      textColor);
+
+  drawLinkIndicator(
+      margin, linkY, width - (margin * 2), wifiConnected, webSocketConnected, accentColor, mutedColor, backgroundColor);
+  drawSignalBars(margin + 48, linkY + 2, wifiConnected ? rssiBarsFromDbm(rssi) : 0, accentColor, mutedColor);
+  drawHorizon(horizonX, horizonY, horizonSize, horizonSize, lastSample, nowMs, accentColor);
+
+  drawBatteryBar(margin, footerY, width - (margin * 2) - 48, 16, batteryPercent, batteryColor, textColor, backgroundColor);
+  displayCanvas.setTextSize(2);
+  displayCanvas.setTextColor(textColor, backgroundColor);
+  displayCanvas.setCursor(width - 48, footerY);
+  displayCanvas.printf("%s", batteryText);
+
+  displayCanvas.setTextSize(1);
+  displayCanvas.setTextColor(textColor, backgroundColor);
+  displayCanvas.setCursor(margin, height - 23);
+  displayCanvas.printf("%.20s", effectiveDeviceId());
+  displayCanvas.setCursor(margin, height - 12);
+  displayCanvas.printf("%.13s %.15s", ipAddress.c_str(), identifying ? "Identify" : latestStatusMessage.c_str());
+  drawTelemetryPulse(margin, height - 6, width - (margin * 2), nowMs, accentColor);
 
   M5.Display.startWrite();
-  M5.Display.fillScreen(backgroundColor);
-  M5.Display.setTextSize(1);
-  M5.Display.setTextColor(textColor, backgroundColor);
-
-  M5.Display.setCursor(margin, 4);
-  M5.Display.printf("M5 WS");
-  M5.Display.setCursor(width - 54, 4);
-  M5.Display.printf("%3d%%", batteryPercent);
-  drawBatteryBar(width - 43, 18, 34, 12, batteryPercent, batteryColor, textColor, backgroundColor);
-
-  M5.Display.setCursor(margin, 20);
-  M5.Display.printf("%.18s", effectiveDeviceId());
-  drawSignalBars(margin, 36, wifiConnected ? rssiBarsFromDbm(rssi) : 0, okColor, mutedColor);
-  drawWebSocketNode(width - 42, 34, webSocketConnected, phase, okColor);
-
-  drawHorizon(horizonX, horizonY, horizonSize, horizonSize, lastSample, phase, accentColor);
-
-  M5.Display.setCursor(margin, footerY);
-  M5.Display.printf("IP %s", ipAddress.c_str());
-  M5.Display.setCursor(margin, footerY + 12);
-  M5.Display.printf("%s %.14s", streamingEnabled ? "LIVE" : "PAUSE", identifying ? "IDENTIFY" : latestStatusMessage.c_str());
-  drawTelemetryPulse(margin, height - 8, width - (margin * 2), phase, accentColor);
-
+  displayCanvas.pushSprite(0, 0);
   M5.Display.endWrite();
 }
 
@@ -758,6 +849,7 @@ void setup() {
   m5Config.clear_display = true;
   m5Config.internal_imu = true;
   M5.begin(m5Config);
+  M5.Display.setRotation(0);
   calibrated = M5.Imu.loadOffsetFromNVS();
 
   WiFi.mode(WIFI_STA);

@@ -8,6 +8,10 @@ build/
 dist/
 coverage/
 serial-probe-logs/
+.fallow/
+.env
+.env.*
+!.env.example
 *.local
 .DS_Store
 *.log

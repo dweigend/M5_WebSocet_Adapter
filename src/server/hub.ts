@@ -2,6 +2,7 @@ import { DeviceRegistry } from "../lib/device-state";
 import { parseDeviceMessage, parseUiMessage, type UiCommandMessage } from "../lib/protocol";
 
 const DEFAULT_PORT = 8787;
+const DEFAULT_HOSTNAME = "127.0.0.1";
 const STALE_SCAN_INTERVAL_MS = 250;
 const UI_TOPIC = "ui-clients";
 
@@ -32,7 +33,7 @@ export function startHub(options: HubOptions = {}): RunningHub {
 
   const server = Bun.serve<ClientData>({
     port: options.port ?? Number(process.env.PORT ?? DEFAULT_PORT),
-    hostname: options.hostname,
+    hostname: options.hostname ?? process.env.HOST ?? DEFAULT_HOSTNAME,
     fetch(request, bunServer) {
       const url = new URL(request.url);
 
@@ -141,10 +142,19 @@ function handleDeviceSocketMessage(
     return;
   }
 
+  const deviceId = parsed.message.deviceId;
+  const activeSocket = deviceSockets.get(deviceId);
+  if (activeSocket && activeSocket !== ws && ws.data.deviceId === deviceId) {
+    ws.close();
+    return;
+  }
+
+  activeSocket?.close();
+  ws.data.deviceId = deviceId;
+  deviceSockets.set(deviceId, ws);
+
   const receivedAt = Date.now();
   const update = registry.upsertFromMessage(parsed.message, receivedAt);
-  ws.data.deviceId = parsed.message.deviceId;
-  deviceSockets.set(parsed.message.deviceId, ws);
 
   publishToUi(server, {
     type: "deviceUpdate",
