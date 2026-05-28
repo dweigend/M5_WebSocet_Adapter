@@ -15,6 +15,7 @@ import TelemetryOverviewPanel from "$lib/TelemetryOverviewPanel.svelte";
 import TelemetryPanel from "$lib/TelemetryPanel.svelte";
 import UsbTestModePanel from "$lib/UsbTestModePanel.svelte";
 import {
+  createDeviceWebSocketUrl,
   createUiCommand,
   createUiWebSocketUrl,
   type UiServerMessage,
@@ -24,7 +25,7 @@ import { createInitialUsbState, UsbTestSession } from "$lib/usb-test-session";
 
 let ssid = $state("");
 let password = $state("");
-let serverUrl = $state("ws://localhost:8787/ws/device");
+let serverUrl = $state("");
 let deviceId = $state("m5stick-plus2-001");
 let usbSession: UsbTestSession | undefined;
 let usbState = $state(createInitialUsbState());
@@ -77,6 +78,12 @@ onMount(() => {
     usbState = nextState;
   });
   usbSession.initialize();
+
+  serverUrl = createDeviceWebSocketUrl(window.location, {
+    deviceHost: import.meta.env.PUBLIC_M5_DEVICE_HOST,
+    hubUrl: import.meta.env.PUBLIC_M5_HUB_URL,
+    hubPort: import.meta.env.PUBLIC_M5_HUB_PORT,
+  });
 
   uiSocket = new UiTelemetrySocket(
     createUiWebSocketUrl(window.location, {

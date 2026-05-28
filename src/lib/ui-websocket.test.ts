@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createUiCommand, createUiWebSocketUrl, parseUiServerMessage } from "./ui-websocket";
+import {
+  createDeviceWebSocketUrl,
+  createUiCommand,
+  createUiWebSocketUrl,
+  parseUiServerMessage,
+} from "./ui-websocket";
 
 describe("UI WebSocket helpers", () => {
   it("builds a local hub URL from the browser location", () => {
@@ -25,6 +30,22 @@ describe("UI WebSocket helpers", () => {
         hubUrl: "ws://127.0.0.1:9000",
       }),
     ).toBe("ws://127.0.0.1:9000/ws/ui");
+  });
+
+  it("builds a controller-reachable device URL from a LAN host", () => {
+    const location = new URL("http://192.168.1.10:5173/?hubPort=8789") as unknown as Location;
+
+    expect(createDeviceWebSocketUrl(location)).toBe("ws://192.168.1.10:8789/ws/device");
+  });
+
+  it("does not prefill loopback addresses for controller setup", () => {
+    const location = new URL("http://localhost:5173") as unknown as Location;
+
+    expect(createDeviceWebSocketUrl(location)).toBe("");
+    expect(createDeviceWebSocketUrl(location, { deviceHost: "127.0.0.1" })).toBe("");
+    expect(createDeviceWebSocketUrl(location, { deviceHost: "192.168.1.10" })).toBe(
+      "ws://192.168.1.10:8787/ws/device",
+    );
   });
 
   it("creates targeted command messages", () => {

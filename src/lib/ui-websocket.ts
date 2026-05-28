@@ -9,8 +9,10 @@ import {
 
 const DEFAULT_HUB_PORT = "8787";
 const UI_WEBSOCKET_PATH = "/ws/ui";
+const DEVICE_WEBSOCKET_PATH = "/ws/device";
 const HUB_URL_QUERY_PARAM = "hubUrl";
 const HUB_PORT_QUERY_PARAM = "hubPort";
+const DEVICE_HOST_QUERY_PARAM = "deviceHost";
 
 export type UiServerMessage =
   | { type: "snapshot"; devices: DeviceSnapshot[] }
@@ -40,6 +42,10 @@ export interface UiWebSocketUrlOptions {
   hubPort?: string;
 }
 
+export interface DeviceWebSocketUrlOptions extends UiWebSocketUrlOptions {
+  deviceHost?: string;
+}
+
 export function createUiWebSocketUrl(
   location: Location,
   options: UiWebSocketUrlOptions = {},
@@ -67,6 +73,24 @@ export function createUiWebSocketUrl(
   const hubPort = normalizeHubPort(options.hubPort);
 
   return `${protocol}//${location.hostname}:${hubPort ?? DEFAULT_HUB_PORT}${UI_WEBSOCKET_PATH}`;
+}
+
+export function createDeviceWebSocketUrl(
+  location: Location,
+  options: DeviceWebSocketUrlOptions = {},
+): string {
+  const locationUrl = new URL(location.href);
+  const deviceHost =
+    normalizeDeviceHost(locationUrl.searchParams.get(DEVICE_HOST_QUERY_PARAM)) ??
+    normalizeDeviceHost(options.deviceHost) ??
+    normalizeDeviceHost(location.hostname);
+
+  if (!deviceHost) {
+    return "";
+  }
+
+  const hubUrl = new URL(createUiWebSocketUrl(location, options));
+  return `${hubUrl.protocol}//${deviceHost}:${hubUrl.port || DEFAULT_HUB_PORT}${DEVICE_WEBSOCKET_PATH}`;
 }
 
 export function createUiCommand(type: DeviceCommandType, deviceId: string): UiCommandMessage {
@@ -151,6 +175,23 @@ function normalizeHubPort(rawHubPort: string | undefined | null): string | undef
   }
 
   return String(hubPort);
+}
+
+function normalizeDeviceHost(rawDeviceHost: string | undefined | null): string | undefined {
+  const deviceHost = rawDeviceHost?.trim();
+
+  if (!deviceHost || isLoopbackHost(deviceHost) || deviceHost.includes("/")) {
+    return undefined;
+  }
+
+  return deviceHost;
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalizedHost = host.toLowerCase();
+  return (
+    normalizedHost === "localhost" || normalizedHost === "::1" || normalizedHost.startsWith("127.")
+  );
 }
 
 function isDeviceSnapshotArray(value: unknown): value is DeviceSnapshot[] {

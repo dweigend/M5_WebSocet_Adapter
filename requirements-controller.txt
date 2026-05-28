@@ -1,2 +1,0 @@
-platformio==6.1.19
-esptool==5.2.0

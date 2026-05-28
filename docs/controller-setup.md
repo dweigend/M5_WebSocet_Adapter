@@ -1,4 +1,4 @@
-# Controller Setup
+# Controller Setup 🚀
 
 This repo treats the M5StickC Plus2 controller setup as part of the project contract. The normal
 runtime is headless WiFi/WebSocket telemetry; USB serial is for setup, recovery, and diagnostics.
@@ -25,12 +25,22 @@ runtime is headless WiFi/WebSocket telemetry; USB serial is for setup, recovery,
 Run from the repo root:
 
 ```sh
-uv venv --allow-existing .venv
-uv pip install --python .venv/bin/python -r requirements-controller.txt
+bun install
+bun run setup:controller
 ```
 
-All official firmware and diagnostic commands use `.venv/bin/...`. Tool versions are pinned in
-`requirements-controller.txt`.
+The guided setup assistant can install the pinned Python/controller tools with `uv`, upload firmware,
+send the serial configuration, run checks, and start the local hub and UI. Tool versions are declared
+in `pyproject.toml` and locked by `uv.lock`.
+
+If you only want to warm up the Python tool cache, run:
+
+```sh
+bun run tools:setup
+```
+
+Still prefer the `bun run ...` scripts below. They call project-aware `uv run` commands, so nobody
+has to rely on global `pio`, `python`, or `esptool`.
 
 ## Firmware Workflow
 
@@ -43,22 +53,31 @@ bun run firmware:monitor
 When the host has multiple serial devices, upload with the explicit CH9102/WCH port:
 
 ```sh
-.venv/bin/pio run -d firmware -t upload --upload-port /dev/cu.usbserial-...
+uv run --group firmware pio run -d firmware -t upload --upload-port /dev/cu.usbserial-...
 ```
 
 ## Headless Runtime
 
-1. Start the local hub:
+The easiest path is:
+
+```sh
+bun run setup:controller
+```
+
+For a fully manual run:
+
+1. Upload firmware with `bun run firmware:upload`.
+2. Start the local hub:
 
    ```sh
    bun run server
    ```
 
-2. Use the UI once over USB serial to save WiFi, WebSocket URL, and device ID.
-3. Reboot the controller.
-4. The controller connects to WiFi, opens the configured WebSocket URL, and streams telemetry to
+3. Use the setup assistant or the UI once over USB serial to save WiFi, WebSocket URL, and device ID.
+4. Reboot the controller.
+5. The controller connects to WiFi, opens the configured WebSocket URL, and streams telemetry to
    `/ws/device`.
-5. The UI connects to `/ws/ui` and observes telemetry through the hub.
+6. The UI connects to `/ws/ui` and observes telemetry through the hub.
 
 ## Diagnostics
 
@@ -83,3 +102,5 @@ the flashed firmware emits JSON frames independently of the UI.
 - **The UI says the hub is offline:** start the hub with `bun run server`; USB diagnostics can still
   work while the hub is offline.
 - **Multiple serial devices are listed:** use the CH9102/WCH device, not unrelated USB CDC devices.
+- **The setup assistant asks for a computer IP:** choose the LAN IP that the controller can reach,
+  not `127.0.0.1`, unless you are only doing a local hub smoke test.

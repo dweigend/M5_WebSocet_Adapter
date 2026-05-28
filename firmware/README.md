@@ -1,4 +1,4 @@
-# Firmware
+# Firmware 🚀
 
 PlatformIO firmware for M5StickC Plus2.
 
@@ -10,7 +10,7 @@ the setup, recovery, and diagnostics path.
 
 - Hardware: M5StickC Plus2 with ESP32-PICO-V3-02.
 - USB-UART: CH9102/WCH; install the CH9102/CP34X driver when the OS does not expose the serial port.
-- Firmware build tool: PlatformIO installed inside the repo `.venv` with `uv`.
+- Firmware build tool: PlatformIO launched through `uv`.
 - PlatformIO environment: `espressif32@6.7.0`, `board = m5stick-c`, `framework = arduino`.
 - Firmware libraries: `M5Unified`, `WebSockets`, and `ArduinoJson`.
 - Serial baud rate: 115200.
@@ -19,12 +19,12 @@ the setup, recovery, and diagnostics path.
 Create the local tool environment from the repo root:
 
 ```sh
-uv venv --allow-existing .venv
-uv pip install --python .venv/bin/python -r requirements-controller.txt
+bun run tools:setup
 ```
 
-Use `.venv/bin/...` tools only. The official repo workflow does not rely on global `pio`, `python`,
-or `esptool` commands.
+The official repo workflow uses project-aware `uv run` commands through the `bun run ...` scripts.
+Python and firmware tool versions live in `pyproject.toml` and `uv.lock`. Do not rely on global
+`pio`, `python`, or `esptool` commands.
 
 ## Build
 
@@ -42,12 +42,18 @@ bun run firmware:monitor
 When multiple serial devices are visible, pass the upload port directly to PlatformIO:
 
 ```sh
-.venv/bin/pio run -d firmware -t upload --upload-port /dev/cu.usbserial-...
+uv run --group firmware pio run -d firmware -t upload --upload-port /dev/cu.usbserial-...
 ```
 
 On macOS, prefer the CH9102/WCH `cu.usbserial...` device for upload and probing.
 
 ## Serial Setup
+
+The easiest setup path is the guided TUI from the repo root:
+
+```sh
+bun run setup:controller
+```
 
 The firmware also streams `register`, `heartbeat`, `imu`, and `orientation` JSON frames over USB
 serial at 115200 baud. This allows a USB-only hardware smoke test before WiFi is configured.
