@@ -1,17 +1,36 @@
+# Dependency directories
 node_modules/
 .venv/
-__pycache__/
-firmware/.pio/
+
+# Build output and generated app state
 .svelte-kit/
 .vite/
 build/
 dist/
 coverage/
+output/
+
+# Python caches and tooling state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ty/
+
+# Firmware build output
+firmware/.pio/
+
+# Local diagnostics and analysis output
 serial-probe-logs/
 .fallow/
+
+# Local configuration and secrets
 .env
 .env.*
 !.env.example
 *.local
+
+# OS and log noise
 .DS_Store
 *.log
