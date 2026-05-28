@@ -40,6 +40,7 @@ from .prompts import (
 )
 from .serial_provision import ProvisioningInput, send_configure_request
 from .tcp_ports import choose_available_port
+from .wifi import detect_current_wifi_ssid
 
 DEFAULT_UI_PORT = 5173
 
@@ -133,12 +134,20 @@ def collect_setup_input(config: SetupConfig) -> SetupInput:
     return SetupInput(
         port=port,
         device_id=prompt_default("Controller ID", suggest_next_device_id(config)),
-        ssid=prompt_required("WiFi SSID"),
+        ssid=choose_wifi_ssid(),
         password=prompt_password(),
         hub_port=hub_port,
         ui_port=ui_port,
         host_ip=choose_host_ip(),
     )
+
+
+def choose_wifi_ssid() -> str:
+    """Use the current WLAN as a prompt default while keeping manual entry possible."""
+    detected_ssid = detect_current_wifi_ssid()
+    if detected_ssid:
+        return prompt_default("WiFi SSID", detected_ssid)
+    return prompt_required("WiFi SSID")
 
 
 def choose_hub_port(default_port: int) -> int:

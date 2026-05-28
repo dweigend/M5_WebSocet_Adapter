@@ -7,8 +7,6 @@ consistent across the setup flow.
 
 from __future__ import annotations
 
-import getpass
-
 
 def prompt_default(label: str, default: str) -> str:
     value = read_input(f"{label} [{default}]: ", default)
@@ -29,10 +27,7 @@ def prompt_optional(label: str) -> str | None:
 
 
 def prompt_password(label: str = "WiFi password") -> str:
-    try:
-        return getpass.getpass(f"{label}: ")
-    except EOFError as error:
-        raise SystemExit(f"{label} is required.") from error
+    return read_input(f"{label}: ", "")
 
 
 def prompt_int(label: str, default: int) -> int:
