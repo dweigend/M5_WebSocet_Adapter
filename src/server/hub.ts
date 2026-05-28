@@ -3,7 +3,6 @@ import { parseDeviceMessage, parseUiMessage, type UiCommandMessage } from "../li
 
 const DEFAULT_PORT = 8787;
 const DEFAULT_HOSTNAME = "0.0.0.0";
-const PORT_SCAN_LIMIT = 50;
 const STALE_SCAN_INTERVAL_MS = 250;
 const UI_TOPIC = "ui-clients";
 
@@ -15,13 +14,6 @@ interface ClientData {
 }
 
 type HubWebSocket = Bun.ServerWebSocket<ClientData>;
-type HubHostname = "localhost" | "127.0.0.1" | "0.0.0.0" | (string & {});
-
-interface HubServeOptions extends Bun.Serve.HostnamePortServeOptions<ClientData> {
-  unix?: never;
-  fetch: (request: Request, server: Bun.Server<ClientData>) => Response | undefined;
-  websocket: Bun.WebSocketHandler<ClientData>;
-}
 
 export interface HubOptions {
   port?: number;
@@ -39,9 +31,9 @@ export function startHub(options: HubOptions = {}): RunningHub {
   const deviceSockets = new Map<string, HubWebSocket>();
   let staleTimer: ReturnType<typeof setInterval> | undefined;
 
-  const server = serveWithPortFallback({
+  const server = Bun.serve<ClientData>({
     port: options.port ?? Number(process.env.PORT ?? DEFAULT_PORT),
-    hostname: normalizeHostname(options.hostname ?? process.env.HOST ?? DEFAULT_HOSTNAME),
+    hostname: options.hostname ?? process.env.HOST ?? DEFAULT_HOSTNAME,
     fetch(request, bunServer) {
       const url = new URL(request.url);
 
@@ -103,40 +95,6 @@ export function startHub(options: HubOptions = {}): RunningHub {
       server.stop(true);
     },
   };
-}
-
-function serveWithPortFallback(options: HubServeOptions): Bun.Server<ClientData> {
-  const preferredPort = Number(options.port ?? DEFAULT_PORT);
-
-  if (!Number.isInteger(preferredPort) || preferredPort === 0) {
-    return Bun.serve<ClientData>(options);
-  }
-
-  for (let offset = 0; offset <= PORT_SCAN_LIMIT; offset += 1) {
-    const port = preferredPort + offset;
-    try {
-      return Bun.serve<ClientData>({ ...options, port } as HubServeOptions);
-    } catch (error) {
-      if (!isAddressInUseError(error) || offset === PORT_SCAN_LIMIT) {
-        throw error;
-      }
-    }
-  }
-
-  return Bun.serve<ClientData>({ ...options, port: 0 } as HubServeOptions);
-}
-
-function normalizeHostname(hostname: string): HubHostname {
-  return hostname as HubHostname;
-}
-
-function isAddressInUseError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "EADDRINUSE"
-  );
 }
 
 function handleDeviceSocketClose(

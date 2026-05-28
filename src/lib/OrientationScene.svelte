@@ -29,6 +29,7 @@ let { orientation, safeMode }: Props = $props();
 
 let canvas: HTMLCanvasElement | undefined = $state();
 let container: HTMLDivElement | undefined = $state();
+let renderError = $state("");
 let stickModel: Group | undefined;
 let targetOrientation = createSensorOrientationQuaternion({ pitch: 0, roll: 0, yaw: 0 });
 
@@ -65,7 +66,14 @@ onMount(() => {
   camera.position.set(0, 1.8, 5.4);
   camera.lookAt(0, 0, 0);
 
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
+  let renderer: WebGLRenderer;
+  try {
+    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
+  } catch {
+    renderError = "WebGL is unavailable in this browser.";
+    return;
+  }
+
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   scene.add(new AmbientLight(0xffffff, 1.5));
@@ -192,4 +200,7 @@ function disposeGroup(group: Group | undefined): void {
 
 <div class="orientation-scene" bind:this={container} aria-label="Live stick orientation">
   <canvas bind:this={canvas}></canvas>
+  {#if renderError}
+    <div class="orientation-fallback" role="status">{renderError}</div>
+  {/if}
 </div>

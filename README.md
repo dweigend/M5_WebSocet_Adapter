@@ -52,6 +52,7 @@ The setup assistant walks you through the whole path:
 - detects or accepts a serial port
 - creates stable computer and controller IDs
 - asks for WiFi credentials without logging or storing the password
+- chooses free hub/UI ports before starting processes
 - chooses the local computer IP the controller should call back to
 - sends the existing USB serial `configure` JSON frame
 - checks the hub
@@ -69,7 +70,11 @@ It must not contain WiFi passwords.
 
 ## Manual Runtime
 
-If you want to run the parts yourself, use two terminals:
+The guided setup is the out-of-the-box path because it chooses one host/port configuration and
+passes it consistently to firmware, hub, and UI. Manual runtime is intentionally explicit so you can
+see the moving pieces.
+
+If `8787` and `5173` are free and you only test on the same computer, use two terminals:
 
 ```sh
 bun run server
@@ -85,22 +90,59 @@ Open:
 http://localhost:5173/
 ```
 
-The hub listens on `127.0.0.1:8787` by default. The controller needs a LAN-reachable URL such as:
+The hub listens on `0.0.0.0:8787` by default. The controller still needs a LAN-reachable URL such
+as:
 
 ```text
 ws://192.168.1.10:8787/ws/device
 ```
 
-Use `HOST=0.0.0.0 bun run server` only when a controller on the local network must reach this
-computer directly.
+If ports are occupied, choose them yourself and pass the same values through:
+
+```sh
+HOST=0.0.0.0 PORT=8790 bun run server
+```
+
+```sh
+PUBLIC_M5_HUB_PORT=8790 PUBLIC_M5_DEVICE_HOST=192.168.1.10 bun run dev -- --host 0.0.0.0 --port 5174
+```
+
+Then configure the controller with:
+
+```text
+ws://192.168.1.10:8790/ws/device
+```
+
+There is no silent hub port fallback in manual mode. If the port is busy, the server should fail
+clearly so the UI and controller do not accidentally look at a different port.
+
+## Runtime Design Choices
+
+The project favors a simple source of truth:
+
+- Guided setup chooses `host_ip`, `hub_port`, and `ui_port` once.
+- `serverUrl`, `uiUrl`, and the hub health URL are derived from those values.
+- The hub binds to the exact requested port.
+- The UI reads the hub port and device host from environment variables or URL query parameters.
+- The firmware stores the device WebSocket URL that setup sent over USB.
+
+This is less clever than auto-discovery, but it is easier to inspect, debug, and explain in class.
+
+The browser UI automatically reconnects to `/ws/ui` after temporary hub restarts. Reconnect is safe
+there because the UI already knows the exact hub URL. The hub itself does not guess a new port
+because there would be no reliable way to tell the already-configured controller about that choice.
+
+The Three.js orientation view has a small WebGL fallback. If a lab computer, remote desktop session,
+or browser policy disables WebGL, the rest of the diagnostics UI should still work.
 
 ## Why USB First?
 
 USB is the safe setup and recovery path. WiFi is the normal runtime path.
 
-The firmware mirrors `register`, `heartbeat`, `imu`, and `orientation` frames over USB serial at
-115200 baud. That means you can verify the hardware before WiFi is working. Once WiFi is configured,
-the controller can run headlessly and stream to the local hub.
+The firmware mirrors setup/status frames and a throttled sample of telemetry over USB serial at
+115200 baud. That means you can verify the hardware before WiFi is working without making serial
+printing the main runtime bottleneck. Once WiFi is configured, the controller can run headlessly and
+stream to the local hub.
 
 The browser UI also has a **Connect via USB** path using Web Serial. The Python setup assistant is
 the calmer option when you want a guided terminal workflow.

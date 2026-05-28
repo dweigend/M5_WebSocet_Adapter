@@ -37,6 +37,11 @@ Every device frame includes:
 - `timeMs`: firmware uptime timestamp
 - `quality`: value from `0` to `1`
 
+The firmware may emit fewer mirrored USB serial telemetry frames than WebSocket telemetry frames.
+That is intentional: USB serial is a diagnostics channel, while WebSocket is the primary runtime
+transport. The JSON shapes stay the same so the UI and probe can parse both paths with the same
+validators.
+
 Register frame:
 
 ```json
@@ -123,3 +128,23 @@ Supported commands:
 - `resume`
 - `identify`
 - `reboot`
+
+## Runtime URLs
+
+The hub exposes two WebSocket paths:
+
+- `/ws/device`: firmware connects here and sends device frames.
+- `/ws/ui`: browser UI connects here and receives snapshots and updates.
+
+The setup assistant derives all runtime URLs from one selected host/port pair:
+
+```text
+host_ip = 192.168.1.10
+hub_port = 8787
+serverUrl = ws://192.168.1.10:8787/ws/device
+hub UI URL = ws://localhost:8787/ws/ui
+hub health URL = http://127.0.0.1:8787/health
+```
+
+The controller receives the LAN URL because it runs on another device. The setup assistant and the
+browser can use localhost URLs because they run on the computer that starts the hub.

@@ -46,6 +46,13 @@ DEFAULT_UI_PORT = 5173
 
 @dataclass(frozen=True)
 class SetupInput:
+    """Single source of truth for one local runtime session.
+
+    The setup assistant chooses these values before starting processes. Derived
+    URLs stay here so hub checks, UI launch, and controller provisioning cannot
+    drift apart.
+    """
+
     port: str
     device_id: str
     ssid: str
@@ -57,6 +64,14 @@ class SetupInput:
     @property
     def server_url(self) -> str:
         return f"ws://{self.host_ip}:{self.hub_port}/ws/device"
+
+    @property
+    def ui_url(self) -> str:
+        return f"http://localhost:{self.ui_port}/"
+
+    @property
+    def hub_health_url(self) -> str:
+        return f"http://127.0.0.1:{self.hub_port}/health"
 
 
 def main() -> int:
@@ -113,12 +128,8 @@ def collect_setup_input(config: SetupConfig) -> SetupInput:
     if not port:
         raise SystemExit("No serial port selected. Connect the controller over USB and try again.")
 
-    available_hub_port = choose_available_port(config.default_hub_port)
-    hub_port = prompt_int("Hub port", available_hub_port)
-    if hub_port != available_hub_port:
-        hub_port = choose_available_port(hub_port)
-
-    ui_port = choose_available_port(DEFAULT_UI_PORT)
+    hub_port = choose_hub_port(config.default_hub_port)
+    ui_port = choose_ui_port(hub_port)
     return SetupInput(
         port=port,
         device_id=prompt_default("Controller ID", suggest_next_device_id(config)),
@@ -130,13 +141,34 @@ def collect_setup_input(config: SetupConfig) -> SetupInput:
     )
 
 
+def choose_hub_port(default_port: int) -> int:
+    """Choose the hub port before launch so every process sees the same value."""
+    available_port = choose_available_port(default_port)
+    if available_port != default_port:
+        print(f"Hub port {default_port} is busy; using {available_port}.")
+
+    selected_port = prompt_int("Hub port", available_port)
+    resolved_port = choose_available_port(selected_port)
+    if resolved_port != selected_port:
+        print(f"Hub port {selected_port} is busy; using {resolved_port}.")
+    return resolved_port
+
+
+def choose_ui_port(hub_port: int) -> int:
+    """Choose a UI port that does not collide with the already selected hub port."""
+    ui_port = choose_available_port(DEFAULT_UI_PORT)
+    if ui_port == hub_port:
+        ui_port = choose_available_port(ui_port + 1)
+    return ui_port
+
+
 def confirm_setup(input_data: SetupInput) -> bool:
     print("\nConfiguration to send:")
     print(f"- Serial port: {input_data.port}")
     print(f"- Controller ID: {input_data.device_id}")
     print(f"- WiFi SSID: {input_data.ssid}")
     print(f"- Hub URL: {input_data.server_url}")
-    print(f"- Browser UI: http://localhost:{input_data.ui_port}/")
+    print(f"- Browser UI: {input_data.ui_url}")
     return confirm("Send this configuration over USB?", default=True)
 
 
@@ -184,7 +216,7 @@ def run_checks() -> bool:
 def start_runtime(input_data: SetupInput) -> None:
     if confirm("Start Bun WebSocket hub now?", default=True):
         start_bun_server(input_data.hub_port)
-    check_hub_health(input_data.hub_port)
+    check_hub_health(input_data.hub_health_url)
     if confirm("Wait for this controller to appear on the hub?", default=True):
         wait_for_controller_on_hub(device_id=input_data.device_id, hub_port=input_data.hub_port)
     if confirm("Start SvelteKit website now?", default=True):
@@ -193,7 +225,7 @@ def start_runtime(input_data: SetupInput) -> None:
             hub_port=input_data.hub_port,
             device_host=input_data.host_ip,
         )
-        print(f"Open http://localhost:{input_data.ui_port}/ in the browser.")
+        print(f"Open {input_data.ui_url} in the browser.")
 
 
 def to_provisioning_input(input_data: SetupInput) -> ProvisioningInput:

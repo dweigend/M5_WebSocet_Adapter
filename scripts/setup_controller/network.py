@@ -59,11 +59,10 @@ def detect_host_ips() -> list[str]:
     return [*lan_ips, "127.0.0.1"]
 
 
-def check_hub_health(hub_port: int) -> bool:
-    url = f"http://127.0.0.1:{hub_port}/health"
-    print(f"\nChecking local hub health: {url}")
+def check_hub_health(hub_health_url: str) -> bool:
+    print(f"\nChecking local hub health: {hub_health_url}")
 
-    if request_health(url):
+    if request_health(hub_health_url):
         print("Hub healthcheck passed.")
         return True
 

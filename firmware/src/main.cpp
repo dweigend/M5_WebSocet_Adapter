@@ -31,11 +31,12 @@ constexpr const char *CommandConfigure = "configure";
 
 constexpr uint32_t WifiReconnectIntervalMs = 3000;
 constexpr uint32_t WebSocketReconnectIntervalMs = 3000;
-constexpr uint32_t WebSocketPingIntervalMs = 1000;
-constexpr uint32_t WebSocketPongTimeoutMs = 1000;
+constexpr uint32_t WebSocketPingIntervalMs = 5000;
+constexpr uint32_t WebSocketPongTimeoutMs = 3000;
 constexpr uint8_t WebSocketMissedPongLimit = 2;
 constexpr uint32_t HeartbeatIntervalMs = 2000;
-constexpr uint32_t ImuIntervalMs = 20;
+constexpr uint32_t ImuIntervalMs = 40;
+constexpr uint32_t SerialTelemetryMirrorIntervalMs = 100;
 constexpr uint32_t DisplayIntervalMs = 250;
 constexpr uint32_t IdentifyDurationMs = 3000;
 constexpr uint32_t SerialBufferLimit = 512;
@@ -94,6 +95,8 @@ uint32_t lastWifiAttemptMs = 0;
 uint32_t lastWebSocketAttemptMs = 0;
 uint32_t lastHeartbeatMs = 0;
 uint32_t lastImuMs = 0;
+uint32_t lastSerialImuMirrorMs = 0;
+uint32_t lastSerialOrientationMirrorMs = 0;
 uint32_t lastDisplayMs = 0;
 uint32_t identifyUntilMs = 0;
 uint32_t lastConnectedStatusChangeMs = 0;
@@ -326,17 +329,46 @@ void sendConfigureResult(bool ok, const char *message) {
   setStatus(message);
 }
 
+bool shouldMirrorTelemetryFrame(uint32_t &lastMirrorMs, uint32_t nowMs);
+bool shouldMirrorFrameToSerial(const char *type, uint32_t nowMs);
+
 template <typename TDocument>
 bool sendJsonDocument(TDocument &document) {
   String payload;
   serializeJson(document, payload);
-  Serial.println(payload);
+  const char *type = document["type"] | "";
+  if (shouldMirrorFrameToSerial(type, millis())) {
+    Serial.println(payload);
+  }
 
   if (!webSocketConnected) {
     return true;
   }
 
   return webSocket.sendTXT(payload);
+}
+
+bool shouldMirrorFrameToSerial(const char *type, uint32_t nowMs) {
+  // USB serial is a diagnostics path. WebSocket remains the primary telemetry path,
+  // so high-rate telemetry is sampled before printing at 115200 baud.
+  if (strcmp(type, FrameTypeImu) == 0) {
+    return shouldMirrorTelemetryFrame(lastSerialImuMirrorMs, nowMs);
+  }
+
+  if (strcmp(type, FrameTypeOrientation) == 0) {
+    return shouldMirrorTelemetryFrame(lastSerialOrientationMirrorMs, nowMs);
+  }
+
+  return true;
+}
+
+bool shouldMirrorTelemetryFrame(uint32_t &lastMirrorMs, uint32_t nowMs) {
+  if (lastMirrorMs != 0 && nowMs - lastMirrorMs < SerialTelemetryMirrorIntervalMs) {
+    return false;
+  }
+
+  lastMirrorMs = nowMs;
+  return true;
 }
 
 template <typename TDocument>

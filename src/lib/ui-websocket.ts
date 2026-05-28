@@ -80,6 +80,8 @@ export function createDeviceWebSocketUrl(
   options: DeviceWebSocketUrlOptions = {},
 ): string {
   const locationUrl = new URL(location.href);
+  // The controller runs on the M5, so browser loopback hosts would point at the
+  // wrong machine. Guided setup passes a LAN host through PUBLIC_M5_DEVICE_HOST.
   const deviceHost =
     normalizeDeviceHost(locationUrl.searchParams.get(DEVICE_HOST_QUERY_PARAM)) ??
     normalizeDeviceHost(options.deviceHost) ??
@@ -266,6 +268,7 @@ function isFiniteNumber(value: unknown): value is number {
 
 export class UiTelemetrySocket {
   readonly #url: string;
+  readonly #reconnectDelayMs: number;
   readonly #listeners = {
     open: new Set<UiSocketEventListener<"open">>(),
     close: new Set<UiSocketEventListener<"close">>(),
@@ -273,9 +276,12 @@ export class UiTelemetrySocket {
     message: new Set<UiSocketEventListener<"message">>(),
   };
   #socket: WebSocket | undefined;
+  #reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  #shouldReconnect = false;
 
-  constructor(url: string) {
+  constructor(url: string, reconnectDelayMs = 1_500) {
     this.#url = url;
+    this.#reconnectDelayMs = reconnectDelayMs;
   }
 
   get connected(): boolean {
@@ -291,6 +297,7 @@ export class UiTelemetrySocket {
   }
 
   connect(): void {
+    this.#shouldReconnect = true;
     if (this.#socket && this.#socket.readyState < WebSocket.CLOSING) {
       return;
     }
@@ -298,8 +305,17 @@ export class UiTelemetrySocket {
     const socket = new WebSocket(this.#url);
     this.#socket = socket;
 
-    socket.addEventListener("open", () => this.#emit("open", undefined));
-    socket.addEventListener("close", () => this.#emit("close", undefined));
+    socket.addEventListener("open", () => {
+      this.#clearReconnectTimer();
+      this.#emit("open", undefined);
+    });
+    socket.addEventListener("close", () => {
+      if (this.#socket === socket) {
+        this.#socket = undefined;
+      }
+      this.#emit("close", undefined);
+      this.#scheduleReconnect();
+    });
     socket.addEventListener("error", () => this.#emit("error", "WebSocket connection failed."));
     socket.addEventListener("message", (event) => {
       if (typeof event.data !== "string") {
@@ -326,8 +342,31 @@ export class UiTelemetrySocket {
   }
 
   disconnect(): void {
+    this.#shouldReconnect = false;
+    this.#clearReconnectTimer();
     this.#socket?.close();
     this.#socket = undefined;
+  }
+
+  #scheduleReconnect(): void {
+    // Reconnect is safe here because the UI reconnects to the same explicit hub URL.
+    if (!this.#shouldReconnect || this.#reconnectTimer) {
+      return;
+    }
+
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = undefined;
+      this.connect();
+    }, this.#reconnectDelayMs);
+  }
+
+  #clearReconnectTimer(): void {
+    if (!this.#reconnectTimer) {
+      return;
+    }
+
+    clearTimeout(this.#reconnectTimer);
+    this.#reconnectTimer = undefined;
   }
 
   #emit<T extends keyof UiSocketEventMap>(eventName: T, payload: UiSocketEventMap[T]): void {
